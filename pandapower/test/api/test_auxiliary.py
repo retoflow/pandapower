@@ -6,6 +6,7 @@
 import pytest
 import gc
 import copy
+import geojson
 import numpy as np
 import pandas as pd
 
@@ -88,27 +89,23 @@ def test_get_indices():
 
 def test_net_deepcopy():
     net = pp.networks.example_simple()
-    net.line_geodata.loc[0, 'coords'] = [[0, 1], [1, 2]]
-    net.bus_geodata.loc[0, ['x', 'y']] = 0, 1
+    net.line.at[0, 'geo'] = geojson.LineString([(0., 1.), (1., 2.)])
+    net.bus.at[0, 'geo'] = geojson.Point((0., 1.))
 
-    pp.control.ContinuousTapControl(net, tid=0, vm_set_pu=1)
+    pp.control.ContinuousTapControl(net, element_index=0, vm_set_pu=1)
     ds = pp.timeseries.DFData(pd.DataFrame(data=[[0, 1, 2], [3, 4, 5]]))
-    pp.control.ConstControl(net, element='load', variable='p_mw', element_index=[0], profile_name=[0], data_source=ds)
+    pp.control.ConstControl(net, element='load', variable='p_mw', element_index=[0],
+                            profile_name=[0], data_source=ds)
 
     net1 = copy.deepcopy(net)
 
     assert not net1.controller.object.at[1].data_source is ds
     assert not net1.controller.object.at[1].data_source.df is ds.df
 
-    assert not net1.line_geodata.coords.at[0] is net.line_geodata.coords.at[0]
-
     if GEOPANDAS_INSTALLED:
-        for tab in ('bus_geodata', 'line_geodata'):
-            if tab == 'bus_geodata':
-                geometry = net[tab].apply(lambda x: shapely.geometry.Point(x.x, x.y), axis=1)
-            else:
-                geometry = net[tab].coords.apply(shapely.geometry.LineString)
-            net[tab] = gpd.GeoDataFrame(net[tab], geometry=geometry)
+        for tab in ('bus', 'line'):
+            net[f'{tab}_geodata'] = gpd.GeoDataFrame(net[tab].geo.dropna().apply(
+                lambda x: x["coordinates"]), geometry=net[tab].geo.dropna())
         net1 = net.deepcopy()
         assert isinstance(net1.line_geodata, gpd.GeoDataFrame)
         assert isinstance(net1.bus_geodata, gpd.GeoDataFrame)
@@ -125,7 +122,7 @@ def test_memory_leaks():
     for _ in range(num):
         net_copy = copy.deepcopy(net)
         # In each net copy it has only one controller
-        pp.control.ContinuousTapControl(net_copy, tid=0, vm_set_pu=1)
+        pp.control.ContinuousTapControl(net_copy, element_index=0, vm_set_pu=1)
 
     gc.collect()
 
@@ -316,4 +313,4 @@ def test_log_characteristic_property():
 
 
 if __name__ == '__main__':
-    pytest.main([__file__, "-x"])
+    pytest.main([__file__, "-xs"])

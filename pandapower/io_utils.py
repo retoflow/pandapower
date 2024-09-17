@@ -5,6 +5,7 @@
 
 import copy
 import importlib
+import io
 import json
 import numbers
 import os
@@ -23,6 +24,7 @@ from packaging.version import Version
 from pandapower import __version__
 import networkx
 import numpy
+import geojson
 import pandas as pd
 from networkx.readwrite import json_graph
 from numpy import ndarray, generic, equal, isnan, allclose, any as anynp
@@ -66,8 +68,6 @@ from pandapower.create import create_empty_network
 from functools import singledispatch
 
 try:
-    import fiona
-    import fiona.crs
     import geopandas
 
     GEOPANDAS_INSTALLED = True
@@ -164,11 +164,16 @@ def to_dict_of_dfs(net, include_results=False, include_std_types=True, include_p
         elif "object" in value.columns:
             columns = [c for c in value.columns if c != "object"]
             tab = value[columns].copy()
-            tab["object"] = value["object"].apply(lambda x: json.dumps(x, cls=PPJSONEncoder,
-                                                                       indent=2))
+            tab["object"] = value["object"].apply(lambda x: json.dumps(x, cls=PPJSONEncoder, indent=2))
             tab = tab[value.columns]
             if "recycle" in tab.columns:
                 tab["recycle"] = tab["recycle"].apply(json.dumps)
+            dodfs[item] = tab
+        elif "geo" in value.columns:
+            columns = [c for c in value.columns if c != "geo"]
+            tab = value[columns].copy()
+            tab["geo"] = value["geo"].apply(lambda x: json.dumps(x, cls=PPJSONEncoder, indent=2))
+            tab = tab[value.columns]
             dodfs[item] = tab
         else:
             dodfs[item] = value
@@ -228,8 +233,9 @@ def from_dict_of_dfs(dodfs, net=None):
                     net[c] = ''
             continue
         elif item in ["line_geodata", "bus_geodata"]:
-            table = table.rename_axis(net[item].index.name)
-            df_to_coords(net, item, table)
+            pass
+        #    table = table.rename_axis(net[item].index.name)
+        #    df_to_coords(net, item, table)
         elif item.endswith("_std_types"):
             # when loaded from Excel, the lists in the DataFrame cells are strings -> we want to convert them back
             # to lists here. There is probably a better way to deal with it.
@@ -255,6 +261,12 @@ def from_dict_of_dfs(dodfs, net=None):
             if not isinstance(table.index, pd.MultiIndex):
                 table = table.rename_axis(net[item].index.name)
             net[item] = table
+            # convert geodata to geojson
+            if item in ["bus", "line"]:
+                if "geo" in table.columns:
+                    table.geo = table.geo.apply(
+                        lambda x: geojson.loads(x, cls=PPJSONDecoder) if pd.notna(x) else x
+                    )
         # set the index to be Int
         try:
             net[item].set_index(net[item].index.astype(np.int64), inplace=True)
@@ -373,8 +385,9 @@ def isinstance_partial(obj, cls):
 
 def check_net_version(net):
     if Version(net["format_version"]) > Version(__version__):
-        logger.warning("pandapowerNet-version is newer than your pandapower version. Please update"
-                       " pandapower `pip install --upgrade pandapower`.")
+        logger.warning(f"pandapowerNet-version ({net['format_version']}) is newer than your "
+                       f"pandapower version ({__version__}). Please update pandapower "
+                       "`pip install --upgrade pandapower`.")
 
 
 class PPJSONEncoder(json.JSONEncoder):
@@ -565,6 +578,8 @@ class FromSerializableRegistry():
         for col in ('object', 'controller'):  # "controller" for backwards compatibility
             if (col in df.columns):
                 df[col] = df[col].apply(self.pp_hook)
+        if 'geo' in df.columns:
+            df['geo'] = df['geo'].dropna().apply(json.dumps).apply(geojson.loads)
         return df
 
     @from_serializable.register(class_name='pandapowerNet', module_name='pandapower.auxiliary')#,
@@ -640,16 +655,21 @@ class FromSerializableRegistry():
     if GEOPANDAS_INSTALLED:
         @from_serializable.register(class_name='GeoDataFrame', module_name='geopandas.geodataframe')
         def GeoDataFrame(self):
-            df = geopandas.GeoDataFrame.from_features(fiona.Collection(self.obj), crs=self.d['crs'])
+            fs = json.loads(self.obj)
+            # for some reason, the id is not parsed as dataframe id, this is a workaround
+            if isinstance(fs, dict) and fs.get("type") == "FeatureCollection":
+                features_lst = fs["features"]
+            else:
+                raise TypeError("not a FeatureCollection")
+            for i, feat in enumerate(features_lst):
+                fs["features"][i]["properties"]["id"] = feat["id"]
+
+            df = geopandas.GeoDataFrame.from_features(fs, crs=self.d['crs'])
             if "id" in df:
                 df.set_index(df['id'].values.astype(numpy.int64), inplace=True)
+                df.drop(columns=["id"], inplace=True)
             else:
                 df.set_index(df.index.values.astype(numpy.int64), inplace=True)
-            # coords column is not handled properly when using from_features
-            if 'coords' in df:
-                # df['coords'] = df.coords.apply(json.loads)
-                valid_coords = ~pd.isnull(df.coords)
-                df.loc[valid_coords, 'coords'] = df.loc[valid_coords, "coords"].apply(json.loads)
             df = df.reindex(columns=self.d['columns'])
 
             # df.astype changes geodataframe to dataframe -> _preserve_dtypes fixes it
@@ -1091,7 +1111,7 @@ def controller_to_serializable(obj):
 def mkdirs_if_not_existent(dir_to_create):
     already_exist = os.path.isdir(dir_to_create)
     os.makedirs(dir_to_create, exist_ok=True)
-    return ~already_exist
+    return not already_exist
 
 
 if SHAPELY_INSTALLED:
