@@ -37,7 +37,6 @@ def net_preparation(net, net_pp, doc):
         doc.Reload()
     time.sleep(0.5)
     pp.set_user_pf_options(net_pp, trafo_model='pi')
-    pp.runpp(net_pp, calculate_voltage_angles=True)
     _unique_naming(net_pp)
     elements = _number_of_elements(net_pp)
     #_adapt_geo_coordinates(net, net_pp)
@@ -295,8 +294,8 @@ def create_sgen(net, net_pp, elements, plotting=True, sgens=None, power_flow_typ
     if sgens is None:
         sgens = net_pp.sgen
     sgens['Element_ID'] = None
-    v_max = net_pp.res_bus.vm_pu.max()
-    v_min = net_pp.res_bus.vm_pu.min()
+    v_max = 2.0
+    v_min = 0.0
     for idx, sgen in sgens.iterrows():
         s = net.CreateElement('DCInfeeder', sgen['Sinc_Name'], net_pp.bus.loc[sgen.bus, 'Sinc_Name'])
         e_id = s.GetValue("Element_ID")
@@ -375,8 +374,8 @@ def create_synchronous(net, net_pp, elements, synchronous, plotting=True, power_
     '''
 
     synchronous['Element_ID'] = None
-    v_max = net_pp.res_bus.vm_pu.max()
-    v_min = net_pp.res_bus.vm_pu.min()
+    v_max = 2.0
+    v_min = 0.0
     for idx, sync in synchronous.iterrows():
         s = net.CreateElement('SynchronousMachine', sync['Sinc_Name'], net_pp.bus.loc[sync.bus, 'Sinc_Name'])
         if power_flow_type == 'pv':
@@ -462,8 +461,8 @@ def create_asymmetric_sgen(net, net_pp, elements, plotting=True, sgens=None, pow
     if sgens is None:
         sgens = net_pp.asymmetric_sgen
     sgens['Element_ID_a'] = sgens['Element_ID_b'] = sgens['Element_ID_c'] = None
-    v_max = net_pp.res_bus.vm_pu.max()
-    v_min = net_pp.res_bus.vm_pu.min()
+    v_max = 2.0
+    v_min = 0.0
 
     def _set_values(s, e_id, power_flow_type, phase):
         if power_flow_type == 'pv':
@@ -1211,8 +1210,12 @@ def create_dcline(net, net_pp, elements, plotting=True, dcline=None):
     '''
     if dcline is None:
         dcline = net_pp.dcline
+    if dcline.empty:
+        return
+    net_pp_temp = copy.deepcopy(net_pp)
+    pp.runpp(net_pp_temp, calculate_voltage_angles=True)
     dcline_from = copy.deepcopy(dcline)
-    res_dcline_from = net_pp.res_dcline.loc[dcline_from.index, :]
+    res_dcline_from = net_pp_temp.res_dcline.loc[dcline_from.index, :]
     dcline_from['vm_pu'] = dcline_from['vm_from_pu']
     dcline_from['bus'] = dcline_from['from_bus']
     dcline_from['sn_mva'] = np.sqrt(dcline_from['p_mw'] ** 2 + res_dcline_from['q_from_mvar'] ** 2)
@@ -1221,7 +1224,7 @@ def create_dcline(net, net_pp, elements, plotting=True, dcline=None):
     create_sgen(net, net_pp, elements, plotting, dcline_from, 'pv', corresponding='dc_line')
 
     dcline_to = copy.deepcopy(dcline)
-    res_dcline_to = net_pp.res_dcline.loc[dcline_to.index, :]
+    res_dcline_to = net_pp_temp.res_dcline.loc[dcline_to.index, :]
     dcline_to['vm_pu'] = dcline_to['vm_to_pu']
     dcline_to['bus'] = dcline_to['to_bus']
     dcline_to['sn_mva'] = np.sqrt(dcline_to['p_mw'] ** 2 + res_dcline_to['q_to_mvar'] ** 2)
