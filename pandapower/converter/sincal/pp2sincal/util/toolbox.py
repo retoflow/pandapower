@@ -261,13 +261,25 @@ def _get_vector_group(vector_group, shift_degree):
                            % shift_degree))
     ttyp = vector_group + str(int(shift_degree / 30))
     ttyp = ttyp.lower()
-    if ttyp == 'yy0':
-        return 6
-    elif ttyp == 'ynd5':
-        return 26
-    elif ttyp == 'yzn5':
-        return 30
-    elif ttyp == 'dyn5':
-        return 24
+    lookup = {'dd0': 1, 'dz0': 2, 'dzn0': 3, 'yny0': 4, 'ynyn0': 5,
+              'yy0': 6, 'yyn0': 7, 'zd0': 8, 'znd0': 9, 'dyn1': 10,
+              'dz1': 11, 'dzn1': 12, 'yd1': 13, 'ynd1': 14, 'ynzn1': 15,
+              'yz1': 16, 'yzn1': 17, 'zd1': 18, 'znd1': 19, 'znyn1': 20,
+              'zy1': 21, 'zyn1': 22, 'dy5': 23, 'dyn5': 24, 'yd5': 25,
+              'ynd5': 26, 'ynz5': 27, 'ynzn5': 28, 'yz5': 29, 'yzn5': 30,
+              'zny5': 31, 'znyn5': 32, 'zy5': 33, 'zyn5': 34, 'dd6': 35,
+              'dz6': 36, 'dzn6': 37, 'yny6': 38, 'ynyn6': 39, 'yy6': 40,
+              'yyn6': 41, 'zd6': 42, 'znd6': 43, 'dy7': 44, 'dyn7': 45,
+              'dz7': 46, 'dzn7': 47, 'yd7': 48, 'ynd7': 49, 'ynzn7': 50,
+              'yz7': 51, 'yzn7': 52, 'zd7': 53, 'znd7': 54, 'znyn7': 55,
+              'zy7': 56, 'zyn7': 57, 'dy11': 58, 'dyn11': 59, 'yd11': 60,
+              'ynd11': 61, 'ynz11': 62, 'ynzn11': 63, 'yz11': 64, 'yzn11': 65,
+              'zny11': 66, 'znyn11': 67, 'zy11': 68, 'zyn11': 69, 'dy1': 70,
+              'y0': 71, 'yn0': 72, 'd0': 73, 'zny1': 74, 'zny7': 75,
+              'ddno': 76, 'dnd0': 77, 'dnyn1': 78, 'dnyn11': 79, 'yndn1': 80,
+              'yndn11': 81}
+
+    if ttyp in lookup.keys():
+        return lookup[ttyp]
     else:
         raise (UserWarning('trafo vector group %s not implemented yet' % ttyp))
