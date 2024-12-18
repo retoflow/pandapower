@@ -950,6 +950,10 @@ def create_switch(net, net_pp, plotting=True, switches=None):
             brk_b.SetValue("Flag_State", int(switch.closed))
             brk_b.SetValue("Name", "switch_" + str(idx))
 
+            # Set thermal limit current
+            if pd.notnull(switch.in_ka):
+                brk_b.SetValue("I_n", switch.in_ka)
+
             b_tid = cnnctr.GetValue("Terminal1.Terminal_ID")
             brk_b.SetValue("Terminal_ID", b_tid)
             net_pp['sincal_lookup'] = pd.concat([net_pp['sincal_lookup'],
@@ -1009,6 +1013,10 @@ def create_switch(net, net_pp, plotting=True, switches=None):
             brk_l.SetValue("Flag_State", int(switch.closed))  # 0: Open, 1: Closed
             brk_l.SetValue("Name", "switch_" + str(idx))
 
+            # Set thermal limit current
+            if pd.notnull(switch.in_ka):
+                brk_l.SetValue("I_n", switch.in_ka)
+
             # Chose correct Terminal (from_bus = Terminal1 | to_bus = Terminal2)
             line_idx = switch.element
             bus_idx = switch.bus
@@ -1054,6 +1062,10 @@ def create_switch(net, net_pp, plotting=True, switches=None):
             # Parametrization
             brk_t.SetValue("Flag_State", int(switch.closed))  # 0: Open, 1: Closed
             brk_t.SetValue("Name", "switch_" + str(idx))
+
+            # Set thermal limit current
+            if pd.notnull(switch.in_ka):
+                brk_t.SetValue("I_n", switch.in_ka)
 
             # Chose correct Terminal (hv_bus = Terminal1 | lv_bus = Terminal2)
             trafo_idx = switch.element
