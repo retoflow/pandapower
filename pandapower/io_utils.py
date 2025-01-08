@@ -575,15 +575,14 @@ class FromSerializableRegistry():
                 if column_names is not None:
                     df.columns.names = column_names
 
-        # recreate jsoned objects
         if 'geo' in df.columns:
             df['geo'] = df['geo'].dropna().apply(json.dumps).apply(geojson.loads)
 
         df_obj = df.select_dtypes(include=['object'])
         for col in df_obj:
             df[col] = df[col].apply(partial(
-                    self.pp_hook, ignore_unknown_objects=self.ignore_unknown_objects
-                ))
+                self.pp_hook, ignore_unknown_objects=self.ignore_unknown_objects
+            ))
             df[col] = df[col].astype(dtype = 'object')
             df.loc[pd.isnull(df[col]), col] = None
         return df
