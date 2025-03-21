@@ -35,7 +35,7 @@ def run_all_tests(parallel=False, n_cpu='auto'):
     Inputs:
     parallel (bool, False) - If true and pytest-xdist is installed, tests are run in parallel
 
-    n_cpu (int, None) - number of CPUs to run the tests on in parallel. Only relevant fo
+    n_cpu (int, 'auto') - number of CPUs to run the tests on in parallel. Only relevant fo
         parallel runs.
     """
 
@@ -57,7 +57,7 @@ def run_fast_tests(parallel=False, n_cpu='auto'):
 
     parallel (bool, False) - If true and pytest-xdist is installed, tests are run in parallel
 
-    n_cpu (int, None) - number of CPUs to run the tests on in parallel. Only relevant for
+    n_cpu (int, 'auto') - number of CPUs to run the tests on in parallel. Only relevant for
         parallel runs.
 
     """
@@ -79,7 +79,7 @@ def run_slow_tests(parallel=False, n_cpu='auto'):
 
     parallel (bool, False) - If true and pytest-xdist is installed, tests are run in parallel
 
-    n_cpu (int, None) - number of CPUs to run the tests on in parallel. Only relevant for
+    n_cpu (int, 'auto') - number of CPUs to run the tests on in parallel. Only relevant for
         parallel runs.
     """
 
@@ -131,7 +131,7 @@ def run_tutorials(parallel=False, n_cpu='auto'):
     :param parallel : If true and pytest-xdist is nistalled, jupyter notebooks are running in parallel
     :type parallel : bool, default False
     :param n_cpu : number of CPUs to run the files on in parallel. Only relevant for parallel runs.
-    :type n_cpu : int, default None
+    :type n_cpu : int, default 'auto'
     :return : No Output.
 
     """
