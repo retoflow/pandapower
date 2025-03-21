@@ -8,7 +8,6 @@ import argparse
 import os
 import shutil
 import tempfile
-from multiprocessing import cpu_count
 
 import pytest
 
@@ -30,12 +29,7 @@ def _remove_logger():
         logger.setLevel(logging.CRITICAL)
 
 
-def _get_cpus():
-    # returns of a string of all available CPUs - 1 or 1 if you only have one CPU
-    return str(cpu_count() - 1) if cpu_count() > 1 else str(1)
-
-
-def run_all_tests(parallel=False, n_cpu=None):
+def run_all_tests(parallel=False, n_cpu='auto'):
     """ function executing all tests
 
     Inputs:
@@ -46,8 +40,6 @@ def run_all_tests(parallel=False, n_cpu=None):
     """
 
     if parallel:
-        if n_cpu is None:
-            n_cpu = _get_cpus()
         err = pytest.main([test_dir, "-xs", "-n", str(n_cpu), "-log_cli=false"])
         if err == 4:
             raise ModuleNotFoundError("Parallel testing not possible. "
@@ -59,7 +51,7 @@ def run_all_tests(parallel=False, n_cpu=None):
     logger.setLevel(logging.INFO)
 
 
-def run_fast_tests(parallel=False, n_cpu=None):
+def run_fast_tests(parallel=False, n_cpu='auto'):
     """ function executing fast tests
     Only executes the tests which are **not** marked as slow with pytest.mark.slow
 
@@ -71,8 +63,6 @@ def run_fast_tests(parallel=False, n_cpu=None):
     """
 
     if parallel:
-        if n_cpu is None:
-            n_cpu = _get_cpus()
         err = pytest.main([test_dir, "-xs", "-m", "not slow", "-n", str(n_cpu)])
         if err == 4:
             raise ModuleNotFoundError("Parallel testing not possible. "
@@ -83,7 +73,7 @@ def run_fast_tests(parallel=False, n_cpu=None):
         pytest.main([test_dir, "-xs", "-m", "not slow"])
 
 
-def run_slow_tests(parallel=False, n_cpu=None):
+def run_slow_tests(parallel=False, n_cpu='auto'):
     """ function executing slow tests
     Only executes the tests which are marked as slow with pytest.mark.slow
 
@@ -94,8 +84,6 @@ def run_slow_tests(parallel=False, n_cpu=None):
     """
 
     if parallel:
-        if n_cpu is None:
-            n_cpu = _get_cpus()
         err = pytest.main([test_dir, "-xs", "-m", "slow", "-n", str(n_cpu)])
         if err == 4:
             raise ModuleNotFoundError("Parallel testing not possible. "
@@ -131,7 +119,7 @@ def start_tests(**settings):
         run_all_tests(parallel=parallel, n_cpu=n_cpu)
 
 
-def run_tutorials(parallel=False, n_cpu=None):
+def run_tutorials(parallel=False, n_cpu='auto'):
     """
     Function to execute all tutorials / jupyter notebooks.
 
@@ -159,8 +147,6 @@ def run_tutorials(parallel=False, n_cpu=None):
         test_dir = tmpdir
 
         if parallel:
-            if n_cpu is None:
-                n_cpu = 'auto'
             err = pytest.main(["--nbmake", f"-n={n_cpu}", test_dir])
             if err == 4:
                 raise ModuleNotFoundError("Parallel testing not possible. Please make sure "
