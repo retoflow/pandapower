@@ -69,6 +69,8 @@ def _replace_invalid_data(net, drop_invalid_geodata):
         net[element]['geo'].fillna('null', inplace=True)
         geo_df = net[element]['geo'].apply(geojson.loads)
         for i, geo in geo_df.items():
+            if geo is None:
+                continue
             coords = geo['coordinates']
             if not drop_invalid_geodata and ((not _is_valid_number(coords[0])) | (not _is_valid_number(coords[1]))):
                 raise ValueError("There exists invalid bus geodata at index %s. Please clean up your data first or "
@@ -90,9 +92,10 @@ def _replace_invalid_data(net, drop_invalid_geodata):
                     raise ValueError(
                         "There exists invalid line geodata at index %s. Please clean up your data first or "
                         "set 'drop_invalid_geodata' to True" % i)
-                elif (not _is_valid_number(x)) and (not _is_valid_number(y)):
+                elif (not _is_valid_number(x)) | (not _is_valid_number(y)):
                     net[element].loc[i, 'geo'] = 'null'
                     logger.warning("line geodata at index %s is invalid and replaced by 'null'" % i)
+                    break
 
 def _convert_geo_data(net, elements_to_deserialize=None, drop_invalid_geodata=True):
     if ((_check_elements_to_deserialize('bus_geodata', elements_to_deserialize)
