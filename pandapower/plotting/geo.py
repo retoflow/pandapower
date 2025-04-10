@@ -355,7 +355,7 @@ def dump_to_geojson(
         else:
             iterator = node_geodata.loc[nodes].items()
         for ind, geom in iterator:
-            if geom is "null":
+            if geom == "null":
                 missing_geom[0] += 1
                 continue
             uid = f"{'bus'}-{ind}"
@@ -381,7 +381,7 @@ def dump_to_geojson(
         else:
             iterator = branch_geodata.loc[branches].items()
         for ind, geom in iterator:
-            if geom is "null":
+            if geom == "null":
                 missing_geom[1] += 1
                 continue
             uid = f"{'line'}-{ind}"
@@ -408,8 +408,8 @@ def dump_to_geojson(
                 geom = geojson.loads(net.bus.geo.at[row.bus])
                 if isinstance(geom, geojson.LineString):
                     logger.warning(f"LineString geometry not supported for type 'switch'. Skipping switch {ind}")
-                    geom = None
-                if geom is None or geom == "[]":
+                    geom = "null"
+                if geom == "null":
                     missing_geom[2] += 1
                     continue
                 features.append(geojson.Feature(geometry=geom, id=uid, properties=prop))
@@ -432,7 +432,7 @@ def dump_to_geojson(
                     geom = geojson.loads(net.bus.geo.at[row.lv_bus])
                     if isinstance(geom, geojson.LineString):
                         logger.warning(f"LineString geometry not supported for type '{t_type}'. Skipping trafo {ind}")
-                    if geom is None or geom == "[]":
+                    if geom == "null":
                         missing_geom[3] += 1
                         continue
                     features.append(geojson.Feature(geometry=geom, id=uid, properties=prop))
@@ -505,8 +505,8 @@ def convert_geodata_to_geojson(
     geo_ldf = net[line_geo_name] if (hasattr(net, line_geo_name) and isinstance(net[line_geo_name], pd.DataFrame)) else pd.DataFrame()
 
     a, b = "yx" if lonlat else "xy"  # substitute x and y with a and b to reverse them if necessary
-    df["geo"] = 'null'
     if not geo_df.empty:
+        df["geo"] = 'null'
         for i, geo in geo_df.iterrows():
             if not drop_invalid_geodata and ((not _is_valid_number(geo.x)) | (not _is_valid_number(geo.y))):
                 raise ValueError("There exists invalid bus geodata at index %s. Please clean up your data first or "
@@ -516,22 +516,23 @@ def convert_geodata_to_geojson(
             else:
                 logger.warning("bus geodata at index %s is invalid and replaced by 'null'" %i)
 
-    ldf["geo"] = 'null'
-    for i, geo in geo_ldf.iterrows():
-        if not geo['coords']:
-            continue
-        coords: List[List[float]] = []
-        for x,y in geo.coords:
-            if not drop_invalid_geodata and ((not _is_valid_number(x)) | (not _is_valid_number(y))):
-                raise ValueError("There exists invalid line geodata at index %s. Please clean up your data first or "
-                                 "set 'drop_invalid_geodata' to True"%i)
-            elif _is_valid_number(x) and _is_valid_number(y):
-                coords += [[float(y), float(x)] if lonlat else [float(x), float(y)]]
-            else:
-                logger.warning("line geodata at index %s is invalid and replaced by 'null'" %i)
-        ls = f'{{"coordinates": {coords}, "type": "LineString"}}'
-        ldf["geo"] = ldf["geo"].astype(object)
-        ldf.loc[i, "geo"] = ls
+    if not geo_ldf.empty:
+        ldf["geo"] = 'null'
+        for i, geo in geo_ldf.iterrows():
+            if not geo['coords']:
+                continue
+            coords: List[List[float]] = []
+            for x,y in geo.coords:
+                if not drop_invalid_geodata and ((not _is_valid_number(x)) | (not _is_valid_number(y))):
+                    raise ValueError("There exists invalid line geodata at index %s. Please clean up your data first or "
+                                     "set 'drop_invalid_geodata' to True"%i)
+                elif _is_valid_number(x) and _is_valid_number(y):
+                    coords += [[float(y), float(x)] if lonlat else [float(x), float(y)]]
+                else:
+                    logger.warning("line geodata at index %s is invalid and replaced by 'null'" %i)
+            ls = f'{{"coordinates": {coords}, "type": "LineString"}}'
+            ldf["geo"] = ldf["geo"].astype(object)
+            ldf.loc[i, "geo"] = ls
 
     if delete:
         if hasattr(net, bus_geo_name):del net[bus_geo_name]
