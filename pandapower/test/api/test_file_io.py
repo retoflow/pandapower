@@ -140,9 +140,9 @@ def test_json(net_in, tmp_path):
         from shapely.geometry import shape, Point, LineString
         import geopandas as gpd
 
-        bus_geometry = net_geo.bus["geo"].dropna().apply(geojson.loads).apply(shape)
+        bus_geometry = net_geo.bus["geo"].apply(geojson.loads).dropna().apply(shape)
         net_geo["bus_geodata"] = gpd.GeoDataFrame(geometry=bus_geometry, crs=f"epsg:4326")
-        line_geometry = net_geo.line["geo"].dropna().apply(geojson.loads).apply(shape)
+        line_geometry = net_geo.line["geo"].apply(geojson.loads).dropna().apply(shape)
         net_geo["line_geodata"] = gpd.GeoDataFrame(geometry=line_geometry, crs=f"epsg:4326")
 
         to_json(net_geo, filename)
