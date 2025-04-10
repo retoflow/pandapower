@@ -22,7 +22,7 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 
-def convert_format(net, elements_to_deserialize=None, validate_geodata=True):
+def convert_format(net, elements_to_deserialize=None, drop_invalid_geodata=True):
     """
     Converts old nets to new format to ensure consistency. The converted net is returned.
     """
@@ -38,7 +38,7 @@ def convert_format(net, elements_to_deserialize=None, validate_geodata=True):
     _add_missing_columns(net, elements_to_deserialize)
     _create_seperate_cost_tables(net, elements_to_deserialize)
     if Version(str(net.format_version)) < Version("3.0.0"):
-        _convert_geo_data(net, elements_to_deserialize, validate_geodata)
+        _convert_geo_data(net, elements_to_deserialize, drop_invalid_geodata)
         _convert_group_element_index(net)
         _convert_trafo_controller_parameter_names(net)
         convert_trafo_pst_logic(net)
@@ -62,7 +62,7 @@ def convert_format(net, elements_to_deserialize=None, validate_geodata=True):
     return net
 
 
-def _convert_geo_data(net, elements_to_deserialize=None, validate_geodata=True):
+def _convert_geo_data(net, elements_to_deserialize=None, drop_invalid_geodata=True):
     if ((_check_elements_to_deserialize('bus_geodata', elements_to_deserialize)
          and _check_elements_to_deserialize('bus', elements_to_deserialize))
         or (_check_elements_to_deserialize('line_geodata', elements_to_deserialize)
@@ -71,7 +71,7 @@ def _convert_geo_data(net, elements_to_deserialize=None, validate_geodata=True):
             if Version(str(net.format_version)) < Version("1.6"):
                 net.bus_geodata = pd.DataFrame.from_dict(net.bus_geodata)
                 net.line_geodata = pd.DataFrame.from_dict(net.line_geodata)
-            convert_geodata_to_geojson(net, validate_geodata=validate_geodata)
+            convert_geodata_to_geojson(net, drop_invalid_geodata=drop_invalid_geodata)
 
 
 def _restore_index_names(net):
