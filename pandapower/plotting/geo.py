@@ -290,6 +290,7 @@ def dump_to_geojson_node_branch(
         branch_name: str = 'line',
         nodes: Union[bool, List[int]] = False,
         branches: Union[bool, List[int]] = False):
+
     def update_props(r: pd.Series) -> None:
         if r.name not in props:
             props[r.name] = {}
@@ -324,7 +325,7 @@ def dump_to_geojson_node_branch(
                 if geom == "null":
                     missing_geom[name] += 1
                     continue
-                uid = f"{'bus'}-{ind}"
+                uid = f"{name}-{ind}"
                 features.append(geojson.Feature(geometry=geojson.loads(geom), id=uid, properties=props[uid]))
     return features, missing_geom[node_name], missing_geom[branch_name]
 
