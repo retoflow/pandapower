@@ -5,6 +5,7 @@
 
 import numpy as np
 import pandas as pd
+import geojson
 
 from packaging.version import Version
 
@@ -12,7 +13,7 @@ from pandapower._version import __version__, __format_version__
 from pandapower.create import create_empty_network, create_poly_cost
 from pandapower.results import reset_results
 from pandapower.control import TrafoController
-from pandapower.plotting.geo import convert_geodata_to_geojson
+from pandapower.plotting.geo import convert_geodata_to_geojson, _is_valid_number
 
 try:
     import pandaplan.core.pplog as logging
@@ -37,6 +38,8 @@ def convert_format(net, elements_to_deserialize=None, drop_invalid_geodata=True)
     _rename_columns(net, elements_to_deserialize)
     _add_missing_columns(net, elements_to_deserialize)
     _create_seperate_cost_tables(net, elements_to_deserialize)
+    if Version(str(net.format_version)) > Version("2.14.11"):
+        _replace_invalid_data(net, drop_invalid_geodata)
     if Version(str(net.format_version)) < Version("3.0.0"):
         _convert_geo_data(net, elements_to_deserialize, drop_invalid_geodata)
         _convert_group_element_index(net)
@@ -61,6 +64,35 @@ def convert_format(net, elements_to_deserialize=None, drop_invalid_geodata=True)
     _restore_index_names(net)
     return net
 
+def _replace_invalid_data(net, drop_invalid_geodata):
+    for element in ['bus', 'bus_dc']:
+        net[element]['geo'].fillna('null', inplace=True)
+        geo_df = net[element]['geo'].apply(geojson.loads)
+        for i, geo in geo_df.items():
+            coords = geo['coordinates']
+            if not drop_invalid_geodata and ((not _is_valid_number(coords[0])) | (not _is_valid_number(coords[1]))):
+                raise ValueError("There exists invalid bus geodata at index %s. Please clean up your data first or "
+                                 "set 'drop_invalid_geodata' to True" % i)
+            elif (not _is_valid_number(coords[0])) | (not _is_valid_number(coords[1])):
+                net[element].loc[i, "geo"] = 'null'
+                logger.warning("bus geodata at index %s is invalid and replaced by 'null'" % i)
+
+    for element in ['line', 'line_dc']:
+        net[element]['geo'].fillna('null', inplace=True)
+        geo_df = net[element]['geo'].apply(geojson.loads)
+        for i, geo in geo_df.items():
+            if geo is None:
+                continue
+            if not geo['coordinates']:
+                net[element].loc[i, 'geo'] = 'null'
+            for x, y in geo['coordinates']:
+                if not drop_invalid_geodata and ((not _is_valid_number(x)) | (not _is_valid_number(y))):
+                    raise ValueError(
+                        "There exists invalid line geodata at index %s. Please clean up your data first or "
+                        "set 'drop_invalid_geodata' to True" % i)
+                elif (not _is_valid_number(x)) and (not _is_valid_number(y)):
+                    net[element].loc[i, 'geo'] = 'null'
+                    logger.warning("line geodata at index %s is invalid and replaced by 'null'" % i)
 
 def _convert_geo_data(net, elements_to_deserialize=None, drop_invalid_geodata=True):
     if ((_check_elements_to_deserialize('bus_geodata', elements_to_deserialize)
@@ -321,7 +353,7 @@ def _add_missing_columns(net, elements_to_deserialize):
     if _check_elements_to_deserialize('bus', elements_to_deserialize) \
             and _check_elements_to_deserialize('bus_geodata', elements_to_deserialize) \
             and "geo" not in net.bus:
-        net.bus["geo"] = np.nan
+        net.bus["geo"] = 'null'
     if _check_elements_to_deserialize('trafo3w', elements_to_deserialize) and \
             "tap_at_star_point" not in net.trafo3w:
         net.trafo3w["tap_at_star_point"] = False
@@ -355,7 +387,7 @@ def _add_missing_columns(net, elements_to_deserialize):
         if "g_us_per_km" not in net.line:
             net.line["g_us_per_km"] = 0.
         if _check_elements_to_deserialize('line_geodata', elements_to_deserialize) and "geo" not in net.line:
-            net.line["geo"] = np.nan
+            net.line["geo"] = 'null'
 
     if _check_elements_to_deserialize('gen', elements_to_deserialize) and \
             "slack" not in net.gen:

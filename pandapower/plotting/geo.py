@@ -554,7 +554,7 @@ def convert_geodata_to_geojson(
     :type drop_invalid_geodata: bool, default True
     """
     abstract_convert_geodata_to_geojson(net, 'bus', 'line', delete, lonlat, drop_invalid_geodata)
-
+    abstract_convert_geodata_to_geojson(net, 'bus_dc', 'line_dc', delete, lonlat, drop_invalid_geodata)
 
 def _is_valid_number(value):
     try:
