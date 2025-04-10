@@ -519,15 +519,6 @@ def create_line_collection(net: pandapowerNet, lines=None,
     OUTPUT:
         **lc** - line collection
     """
-    if line_table == "line":
-        dc = False
-        line_geodata_table = "line_geodata"
-    elif line_table == "line_dc":
-        dc = True
-        line_geodata_table = "line_dc_geodata"
-    else:
-        raise NotImplementedError(f"line table {line_table} not implemented!")
-
     if not MATPLOTLIB_INSTALLED:
         soft_dependency_error(str(sys._getframe().f_code.co_name) + "()", "matplotlib")
 
@@ -542,7 +533,7 @@ def create_line_collection(net: pandapowerNet, lines=None,
         return None
 
     line_geodata: Series[str] = line_geodata.loc[lines] if line_geodata is not None else net[line_table].geo.loc[lines]
-    lines_without_geo = line_geodata.index[line_geodata.isna()]
+    lines_without_geo = line_geodata.index[line_geodata == "null"]
 
     if use_bus_geodata or not lines_without_geo.empty:
         elem_indices = lines if use_bus_geodata else lines_without_geo
@@ -557,7 +548,7 @@ def create_line_collection(net: pandapowerNet, lines=None,
 
         line_geodata = line_geodata.combine_first(pd.Series(geos, index=line_index_successful))
 
-    lines_without_geo = line_geodata.index[line_geodata.isna()]
+    lines_without_geo = line_geodata.index[line_geodata == "null"]
     if not lines_without_geo.empty:
         logger.warning(
             f'Could not plot lines {lines_without_geo}. Bus geodata is missing for those lines!')
