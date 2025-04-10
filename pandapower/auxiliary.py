@@ -417,7 +417,7 @@ class GeoAccessor:
         """
         Converts the PandasSeries to a GeoSeries with shapely geometrys.
         """
-        return GeoSeries(self._obj.pipe(from_geojson), crs=4326, index=self._obj.dropna().index)
+        return GeoSeries(self._obj.pipe(from_geojson), crs=4326, index=self._obj.index)
 
     def __getattr__(self, item):
         """

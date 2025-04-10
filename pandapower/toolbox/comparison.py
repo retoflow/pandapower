@@ -49,24 +49,12 @@ def dataframes_equal(df1, df2, ignore_index_order=True, **kwargs):
     # --- compare geo columns
     if "geo" in df1.columns and "geo" in df2.columns:
         not_eq_warn = "DataFrames do not match in column 'geo'."
-        notnull1 = df1.geo.index[~df1.geo.isnull()]
-        notnull1 = df1.geo.loc[notnull1].index[df1.geo.loc[notnull1].apply(len).astype(bool)]
-        notnull2 = df2.geo.index[~df2.geo.isnull()]
-        notnull2 = df2.geo.loc[notnull2].index[df2.geo.loc[notnull2].apply(len).astype(bool)]
-
-        if len(notnull1) + len(notnull2) == 0:
-            return True
-
-        # check equal index with geo data
-        if len(notnull1.symmetric_difference(notnull2)):
-            logger.warning(not_eq_warn)
-            return False
 
         # create DataFrames from geo information
         df1_geo = pd.concat([pd.read_json(StringIO(df1.geo.at[idx])).assign(**{"idx": idx}) for idx
-                             in notnull1])
+                             in df1.geo.index])
         df2_geo = pd.concat([pd.read_json(StringIO(df2.geo.at[idx])).assign(**{"idx": idx}) for idx
-                             in notnull2])
+                             in df2.geo.index])
 
         # check equal columns and reorder columns of df2_geo
         if len(df1_geo.columns.symmetric_difference(df2_geo.columns)):
