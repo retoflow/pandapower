@@ -240,7 +240,7 @@ def _prepare_geodata_table(net, geodata_table, overwrite):
             geojson.loads).dropna().shape[0]:
         if overwrite:
             net[geodata_table] = net[geodata_table].drop("geo", axis=1)
-            net[geodata_table] = net[geodata_table].loc[net[geodata_table] != 'null']
+            net[geodata_table] = net[geodata_table].apply(geojson.loads).dropna(how='all').apply(geojson.dumps)
         else:
             raise UserWarning(f"Table {geodata_table} is not empty - use overwrite=True to overwrite existing geodata")
 
