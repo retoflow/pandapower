@@ -545,7 +545,7 @@ def create_line_collection(net: pandapowerNet, lines=None,
             table_name="line",
             node_name="bus",
             ignore_no_geo_diff=True)
-
+        line_geodata.loc[lines_without_geo] = None
         line_geodata = line_geodata.combine_first(pd.Series(geos, index=line_index_successful))
 
     lines_without_geo = line_geodata.index[line_geodata == "null"]
