@@ -52,9 +52,9 @@ def dataframes_equal(df1, df2, ignore_index_order=True, **kwargs):
 
         # create DataFrames from geo information
         df1_geo = pd.concat([pd.read_json(StringIO(df1.geo.at[idx])).assign(**{"idx": idx}) for idx
-                             in df1.geo.index])
+                             in df1.geo.index]) if len(df1.geo.index) else df1[['geo']]
         df2_geo = pd.concat([pd.read_json(StringIO(df2.geo.at[idx])).assign(**{"idx": idx}) for idx
-                             in df2.geo.index])
+                             in df2.geo.index]) if len(df2.geo.index) else df2[['geo']]
 
         # check equal columns and reorder columns of df2_geo
         if len(df1_geo.columns.symmetric_difference(df2_geo.columns)):
