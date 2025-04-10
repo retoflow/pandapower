@@ -585,7 +585,7 @@ def _create_branch_trace(net, branches=None, use_branch_geodata=True, respect_se
     branches_to_plot = net[branch_element].loc[list(set(net[branch_element].index) &
                                                     (set(branches) - no_go_branches))]
     no_go_branches_to_plot = None
-    use_branch_geodata = use_branch_geodata if net[branch_element]["geo"].dropna().shape[0] > 0 else False
+    use_branch_geodata = use_branch_geodata if net[branch_element]["geo"].apply(geojson.loads).dropna().shape[0] > 0 else False
     if use_branch_geodata:
         branches_to_plot = branches_to_plot.loc[np.intersect1d(branches_to_plot.index,
                                                                net[branch_element].index)]
