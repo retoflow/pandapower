@@ -6146,6 +6146,7 @@ def _add_multiple_branch_geodata(net, geodata, index, table="line"):
             raise ValueError("geodata needs to be list or tuple")
         elif all([isinstance(g, tuple) and len(g) == 2 for g in geodata]):
             geodata = _branch_geodata(geodata)
+            geodata = [f'{{"coordinates": {geodata}, "type": "LineString"}}']
             series = geodata * len(index)
         elif all([isinstance(g, Iterable) for g in geodata]):
             series = []
