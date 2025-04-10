@@ -369,7 +369,7 @@ class GeoAccessor:
     @staticmethod
     def _validate(obj):
         try:
-            if not obj.dropna().apply(loads).apply(isinstance, args=(GeoJSON,)).all():
+            if not obj.apply(loads).dropna().apply(isinstance, args=(GeoJSON,)).all():
                 raise AttributeError("Can only use .geojson accessor with geojson string values!")
         except Exception as e:
             raise AttributeError(f"Can only use .geojson accessor with geojson string values!: {e}")
@@ -389,35 +389,35 @@ class GeoAccessor:
         It is not recommended to use the standalone coordinates.
         Important informations like the crs or latlon/lonlat are lost as a result.
         """
-        return self._obj.dropna().apply(loads).apply(self._extract_coords)
+        return self._obj.apply(loads).dropna().apply(self._extract_coords)
 
     @property
     def as_geo_obj(self):
         """
         Loads the GeoJSON objects.
         """
-        return self._obj.dropna().apply(loads)
+        return self._obj.apply(loads).dropna()
 
     @property
     def type(self):
         """
         Extracts the geometry type of the GeoJSON string.
         """
-        return self._obj.dropna().apply(loads).apply(lambda x: str(x["type"]))
+        return self._obj.apply(loads).dropna().apply(lambda x: str(x["type"]))
 
     @property
     def as_shapely_obj(self):
         """
         Converts the GeoJSON strings to shapely geometrys.
         """
-        return self._obj.dropna().apply(from_geojson)
+        return self._obj.apply(from_geojson)
 
     @property
     def as_geoseries(self):
         """
         Converts the PandasSeries to a GeoSeries with shapely geometrys.
         """
-        return GeoSeries(self._obj.dropna().pipe(from_geojson), crs=4326, index=self._obj.dropna().index)
+        return GeoSeries(self._obj.pipe(from_geojson), crs=4326, index=self._obj.dropna().index)
 
     def __getattr__(self, item):
         """

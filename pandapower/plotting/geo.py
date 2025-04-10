@@ -3,13 +3,10 @@
 # Copyright (c) 2016-2023 by University of Kassel and Fraunhofer Institute for Energy Economics
 # and Energy System Technology (IEE), Kassel. All rights reserved.
 
-from typing import List, Tuple, TYPE_CHECKING, Dict, Any, Union
+from typing import List, Union
 
 import numpy as np
 
-# TYPE_CHECKING is used to avoid circular imports, see https://stackoverflow.com/a/39757388
-if TYPE_CHECKING:
-    import pandapipes
 from typing_extensions import deprecated
 
 import sys
@@ -230,21 +227,21 @@ def convert_epsg_bus_geodata(net, epsg_in=4326, epsg_out=31467):
     return net
 
 
-def convert_crs(net: pandapowerNet or 'pandapipes.pandapipesNet', epsg_in=4326, epsg_out=31467):
+def convert_crs(net: pandapowerNet, epsg_in=4326, epsg_out=31467):
     """
-    This function works for pandapowerNet and pandapipesNet. Documentation will refer to names from pandapower.
+    This function works for pandapowerNet. Documentation will refer to names from pandapower.
     Converts bus and line geodata in net from epsg_in to epsg_out
     if GeoDataFrame data is present convert_geodata_to_gis should be used to update geometries after crs conversion
 
     :param net: The pandapower network
-    :type net: pandapowerNet|pandapipesNet
+    :type net: pandapowerNet
     :param epsg_in: current epsg projection
     :type epsg_in: int, default 4326 (= WGS84)
     :param epsg_out: epsg projection to be transformed to
     :type epsg_out: int, default 31467 (= Gauss-Krüger Zone 3)
     :return: net - the given pandapower network (no copy!)
     """
-    is_pandapower = net.__class__.__name__ == 'pandapowerNet'
+
     if epsg_in == epsg_out:
         return
 
@@ -260,31 +257,22 @@ def convert_crs(net: pandapowerNet or 'pandapipes.pandapipesNet', epsg_in=4326, 
 
     def _geo_node_transformer(r):
         (x, y) = transformer.transform(r.x, r.y)
-        if is_pandapower:
-            coords = r.coords
-            if coords and not pd.isna(coords):
-                coords = _geo_branch_transformer(coords)
-            return pd.Series([x, y, coords], ["x", "y", "coords"])
-        else:
-            return pd.Series([x, y], ["x", "y"])
+        coords = r.coords
+        if coords and not pd.isna(coords):
+            coords = _geo_branch_transformer(coords)
+        return pd.Series([x, y, coords], ["x", "y", "coords"])
 
     def _geo_branch_transformer(r):
         return list(transformer.itransform(r))
 
-    if is_pandapower:
-        net.bus_geodata = net.bus_geodata.apply(lambda r: _geo_node_transformer(r), axis=1)
-        net.line_geodata.coords = net.line_geodata.coords.apply(lambda r: _geo_branch_transformer(r))
-        net.bus_geodata.attrs = {"crs": f"EPSG:{epsg_out}"}
-        net.line_geodata.attrs = {"crs": f"EPSG:{epsg_out}"}
-    else:
-        net.junction_geodata = net.junction_geodata.apply(lambda r: _geo_node_transformer(r), axis=1)
-        net.pipe_geodata.coords = net.pipe_geodata.coords.apply(lambda r: _geo_branch_transformer(r))
-        net.junction_geodata.attrs = {"crs": f"EPSG:{epsg_out}"}
-        net.pipe_geodata.attrs = {"crs": f"EPSG:{epsg_out}"}
+    net.bus_geodata = net.bus_geodata.apply(lambda r: _geo_node_transformer(r), axis=1)
+    net.line_geodata.coords = net.line_geodata.coords.apply(lambda r: _geo_branch_transformer(r))
+    net.bus_geodata.attrs = {"crs": f"EPSG:{epsg_out}"}
+    net.line_geodata.attrs = {"crs": f"EPSG:{epsg_out}"}
 
 
 def dump_to_geojson(
-        net: pandapowerNet or 'pandapipes.pandapipesNet',
+        net: pandapowerNet,
         nodes: Union[bool, List[int]] = False,
         branches: Union[bool, List[int]] = False,
         switches: Union[bool,  List[int]] = False,
@@ -292,7 +280,7 @@ def dump_to_geojson(
         t_is_3w: bool = False
 ) -> geojson.FeatureCollection:
     """
-    This function works for pandapowerNet and pandapipesNet. Documentation will refer to names from pandapower.
+    This function works for pandapowerNet. Documentation will refer to names from pandapower.
     Dumps all primitive values from bus, bus_geodata, res_bus, line, line_geodata and res_line into a geojson object.
     It is recommended to only dump networks using WGS84 for GeoJSON specification compliance.
 
@@ -302,7 +290,7 @@ def dump_to_geojson(
     to them are located!
 
     :param net: The pandapower network
-    :type net: pandapowerNet|pandapipesNet
+    :type net: pandapowerNet
     :param nodes: if True return contains all bus data, can be a list of bus ids that should be contained
     :type nodes: bool | list, default False
     :param branches: if True return contains all line data, can be a list of line ids that should be contained
@@ -316,26 +304,18 @@ def dump_to_geojson(
     :return: A geojson object.
     :return type: geojson.FeatureCollection
     """
-    is_pandapower = net.__class__.__name__ == 'pandapowerNet'
 
     if not geojson_INSTALLED:
         soft_dependency_error(str(sys._getframe().f_code.co_name) + "()", "geojson")
 
     try:
-        if is_pandapower:
-            if hasattr(net, "bus_geodata") or hasattr(net, "line_geodata"):
-                raise UserWarning("""The supplied network uses an outdated geodata format. Please update your geodata by
-                                     \rrunning `pandapower.plotting.geo.convert_geodata_to_geojson(net)`""")
-            else:
-                node_geodata = net.bus.geo
-                branch_geodata = net.line.geo
+        if hasattr(net, "bus_geodata") or hasattr(net, "line_geodata"):
+            raise UserWarning("""The supplied network uses an outdated geodata format. Please update your geodata by
+                                 \rrunning `pandapower.plotting.geo.convert_geodata_to_geojson(net)`""")
         else:
-            if hasattr(net, "junction_geodata") or hasattr(net, "pipe_geodata"):
-                raise UserWarning("""The supplied network uses an outdated geodata format. Please update your geodata by
-                                     \rrunning `pandapower.plotting.geo.convert_geodata_to_geojson(net)`""")
-            else:
-                node_geodata = net.junction.geo
-                branch_geodata = net.pipe.geo
+            node_geodata = net.bus.geo
+            branch_geodata = net.line.geo
+
     except UserWarning as e:
         logger.warning(e)
         return geojson.FeatureCollection([])
@@ -359,12 +339,12 @@ def dump_to_geojson(
     # build geojson features for nodes
     if nodes:
         props = {}
-        for table in (['bus', 'res_bus'] if is_pandapower else ['junction', 'res_junction']):
+        for table in ['bus', 'res_bus']:
             if table not in net.keys():
                 continue
 
             tempdf = net[table].copy(deep=True)
-            tempdf['pp_type'] = 'bus' if is_pandapower else 'junction'
+            tempdf['pp_type'] = 'bus'
             tempdf['pp_index'] = tempdf.index
             tempdf.index = tempdf.apply(lambda r: f"{r['pp_type']}-{r['pp_index']}", axis=1)
             tempdf.drop(columns=['geo'], inplace=True, axis=1, errors='ignore')
@@ -375,42 +355,39 @@ def dump_to_geojson(
         else:
             iterator = node_geodata.loc[nodes].items()
         for ind, geom in iterator:
-            if geom is None or pd.isna(geom) or geom == "[]":
+            if geom is "null":
                 missing_geom[0] += 1
                 continue
-            uid = f"{'bus' if is_pandapower else 'junction'}-{ind}"
+            uid = f"{'bus'}-{ind}"
             features.append(geojson.Feature(geometry=geojson.loads(geom), id=uid, properties=props[uid]))
 
     # build geojson features for branches
     if branches:
         props = {}
-        for table in (['line', 'res_line'] if is_pandapower else ['pipe', 'res_pipe']):
+        for table in ['line', 'res_line']:
             if table not in net.keys():
                 continue
 
             tempdf = net[table].copy(deep=True)
-            tempdf['pp_type'] = 'line' if is_pandapower else 'pipe'
+            tempdf['pp_type'] = 'line'
             tempdf['pp_index'] = tempdf.index
             tempdf.index = tempdf.apply(lambda r: f"{r['pp_type']}-{r['pp_index']}", axis=1)
             tempdf.drop(columns=['geo'], inplace=True, axis=1, errors='ignore')
 
             tempdf.apply(update_props, axis=1)
 
-        # Iterating over pipe_geodata won't work
-        # pipe_geodata only contains pipes that have inflection points!
         if isinstance(branches, bool):
-            # if all iterating over pipe
             iterator = branch_geodata.items()
         else:
             iterator = branch_geodata.loc[branches].items()
         for ind, geom in iterator:
-            if geom is None or pd.isna(geom) or geom == "[]":
+            if geom is "null":
                 missing_geom[1] += 1
                 continue
-            uid = f"{'line' if is_pandapower else 'pipe'}-{ind}"
+            uid = f"{'line'}-{ind}"
             features.append(geojson.Feature(geometry=geojson.loads(geom), id=uid, properties=props[uid]))
 
-    if switches and is_pandapower:
+    if switches:
         if isinstance(switches, bool):
             switches = net.switch.index
         if 'switch' in net.keys():
@@ -437,7 +414,7 @@ def dump_to_geojson(
                     continue
                 features.append(geojson.Feature(geometry=geom, id=uid, properties=prop))
 
-        if trafos and is_pandapower:
+        if trafos:
             t_type = 'trafo3w' if t_is_3w else 'trafo'
             if isinstance(trafos, bool):
                 trafos = net[t_type].index
@@ -500,12 +477,13 @@ def dump_to_geojson(
 
 
 def convert_geodata_to_geojson(
-        net: pandapowerNet or 'pandapipes.pandapipesNet',
+        net: pandapowerNet,
+        node_name: str = 'bus',
+        branch_name: str = 'line',
         delete: bool = True,
         lonlat: bool = False) -> None:
     """
     Converts bus_geodata and line_geodata to bus.geo and line.geo column entries.
-    If used on pandapipesNet, the junction_geodata and pipe_geodata are converted.
 
     It is expected that any input network has its coords in WGS84 (epsg:4326) projection.
     If this is not the case use convert_crs to convert the network to WGS84.
@@ -517,55 +495,48 @@ def convert_geodata_to_geojson(
     :param lonlat: If True, the coordinates are expected to be in lonlat format (x=lon, y=lat)
     :type lonlat: bool, default False
     """
-    is_pandapower = net.__class__.__name__ == 'pandapowerNet'
 
-    if is_pandapower:
-        df = net.bus
-        ldf = net.line
-        geo_df = net.bus_geodata if (hasattr(net, 'bus_geodata') and isinstance(net.bus_geodata, pd.DataFrame)) else pd.DataFrame()
-        geo_ldf = net.line_geodata if (hasattr(net, 'line_geodata') and isinstance(net.line_geodata, pd.DataFrame)) else pd.DataFrame()
-    else:
-        df = net.junction
-        ldf = net.pipe
-        geo_df = net.junction_geodata if (hasattr(net, 'junction_geodata') and isinstance(net.junction_geodata, pd.DataFrame)) else pd.DataFrame()
-        geo_ldf = net.pipe_geodata if (hasattr(net, 'pipe_geodata') and isinstance(net.pipe_geodata, pd.DataFrame)) else pd.DataFrame()
+    df = net[node_name]
+    ldf = net[branch_name]
+    bus_geo_name = node_name + '_geodata'
+    line_geo_name = branch_name + '_geodata'
+    geo_df = net[bus_geo_name] if (hasattr(net, bus_geo_name) and isinstance(net[bus_geo_name], pd.DataFrame)) else pd.DataFrame()
+    geo_ldf = net[line_geo_name] if (hasattr(net, line_geo_name) and isinstance(net[line_geo_name], pd.DataFrame)) else pd.DataFrame()
 
     a, b = "yx" if lonlat else "xy"  # substitute x and y with a and b to reverse them if necessary
+    df["geo"] = 'null'
     if not geo_df.empty:
-        df["geo"] = geo_df.apply(lambda r: f'{{"coordinates": [{r[a]}, {r[b]}], "type": "Point"}}', axis=1)
+        for i, geo in geo_df.iterrows():
+            if _is_valid_number(geo.x) and _is_valid_number(geo.y):
+                df.loc[i, "geo"] = f'{{"coordinates": [{float(geo[a])}, {float(geo[b])}], "type": "Point"}}'
 
-    ldf["geo"] = np.nan
-    for l_id in ldf.index:
-        if l_id not in geo_ldf.index:
+    ldf["geo"] = 'null'
+    for i, geo in geo_ldf.iterrows():
+        if not geo['coords']:
             continue
-        # pandapipes currently only stores inflection points for pipes. This function will inject start and end points.
-        if is_pandapower:
-            coords: List[List[float]] = [[y, x] if lonlat else [x, y] for x, y in geo_ldf.coords.at[l_id]]
-        else:
-            coords: List[List[float]] = []
-            from_coords = geo_df.loc[ldf[l_id].from_junction]
-            to_coords = geo_df.loc[ldf[l_id].to_junction]
-            coords.append([float(from_coords.x), float(from_coords.y)])
-            if l_id in net.pipe_geodata:
-                coords.append(geo_ldf.loc[l_id].coords)
-            coords.append([float(to_coords.x), float(to_coords.y)])
-        if not coords:
-            continue
+        coords: List[List[float]] = []
+        for x,y in geo.coords:
+            if _is_valid_number(x) and _is_valid_number(y):
+                coords += [[float(y), float(x)] if lonlat else [float(x), float(y)]]
         ls = f'{{"coordinates": {coords}, "type": "LineString"}}'
         ldf["geo"] = ldf["geo"].astype(object)
-        ldf.geo.at[l_id] = ls
+        ldf.loc[i, "geo"] = ls
 
     if delete:
-        if is_pandapower:
-            if hasattr(net, 'bus_geodata'):del net.bus_geodata
-            if hasattr(net, 'line_geodata'): del net.line_geodata
-        else:
-            if hasattr(net, 'junction_geodata'): del net.junction_geodata
-            if hasattr(net, 'pipe_geodata'): del net.pipe_geodata
+        if hasattr(net, bus_geo_name):del net[bus_geo_name]
+        if hasattr(net, line_geo_name): del net[line_geo_name]
 
+def _is_valid_number(value):
+    try:
+        float_value = float(value)
+        return not (isinstance(value, float) and np.isnan(float_value))
+    except (ValueError, TypeError):
+        return False
 
 def convert_gis_to_geojson(
-        net: pandapowerNet or 'pandapipes.pandapipesNet',
+        net: pandapowerNet,
+        node_name: str = 'bus',
+        branch_name: str = 'line',
         delete: bool = True) -> None:
     """
     Transforms the bus and line geodataframes of a net into a geojson object.
@@ -577,19 +548,10 @@ def convert_gis_to_geojson(
     :return: No output.
     """
 
-    is_pandapower = net.__class__.__name__ == 'pandapowerNet'
+    net[node_name]["geo"] = _transform_node_geometry_to_geojson(net[node_name + "_geodata"])
+    net[branch_name]["geo"] = _transform_branch_geometry_to_geojson(net[branch_name + "_geodata"])
 
-    if is_pandapower:
-        net.bus["geo"] = _transform_node_geometry_to_geojson(net["bus_geodata"])
-        net.line["geo"] = _transform_branch_geometry_to_geojson(net["line_geodata"])
+    if delete:
+        del net[node_name + "_geodata"]
+        del net[branch_name + "_geodata"]
 
-        if delete:
-            del net.bus_geodata
-            del net.line_geodata
-    else:
-        net.junction["geo"] = _transform_node_geometry_to_geojson(net["junction_geodata"])
-        net.pipe["geo"] = _transform_branch_geometry_to_geojson(net["pipe_geodata"])
-
-        if delete:
-            del net.junction_geodata
-            del net.pipe_geodata

@@ -21,8 +21,8 @@ from pandapower.test.helper_functions import create_test_network
 
 def _bus_geojson_to_geodata_(_net):
     _net["bus_geodata"] = pd.DataFrame(
-        _net.bus.geo.dropna().apply(geojson.loads).apply(geojson.utils.coords).apply(next).to_list(),
-        index=_net.bus.geo.dropna().index,
+        _net.bus.geo.apply(geojson.loads).dropna().apply(geojson.utils.coords).apply(next).to_list(),
+        index=_net.bus.geo.apply(geojson.loads).dropna().index,
         columns=["x", "y"]
     )
     _net["bus_geodata"]["coords"] = math.nan
@@ -31,7 +31,7 @@ def _bus_geojson_to_geodata_(_net):
 
 
 def _line_geojson_to_geodata_(_net):
-    _net["line_geodata"] = _net.line.geo.dropna().apply(geojson.loads).apply(geojson.utils.coords).apply(
+    _net["line_geodata"] = _net.line.geo.apply(geojson.loads).dropna().apply(geojson.utils.coords).apply(
         list).to_frame().rename(columns={"geo": "coords"})
     _net.line.drop("geo", axis=1, inplace=True)
 
@@ -381,9 +381,9 @@ def test_convert_geodata_to_geojson():
     convert_geodata_to_geojson(_net)
 
     # Überprüfe die Ergebnisse
-    assert _net.bus.at[0, "geo"] == geojson.dumps(geojson.Point((10, 20)), sort_keys=True)
-    assert _net.bus.at[1, "geo"] == geojson.dumps(geojson.Point((30, 40)), sort_keys=True)
-    assert _net.line.at[0, "geo"] == geojson.dumps(geojson.LineString([(10, 20), (30, 40)]), sort_keys=True)
+    assert _net.bus.at[0, "geo"] == geojson.dumps(geojson.Point((10., 20.)), sort_keys=True)
+    assert _net.bus.at[1, "geo"] == geojson.dumps(geojson.Point((30., 40.)), sort_keys=True)
+    assert _net.line.at[0, "geo"] == geojson.dumps(geojson.LineString([(10., 20.), (30., 40.)]), sort_keys=True)
     # TODO: Test could be more exhaustive (e.g. test delete=False, lonlat=True, geo_str=False)
 
 
