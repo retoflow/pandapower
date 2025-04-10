@@ -240,7 +240,7 @@ def _prepare_geodata_table(net, geodata_table, overwrite):
             geojson.loads).dropna().shape[0]:
         if overwrite:
             net[geodata_table] = net[geodata_table].drop("geo", axis=1)
-            net[geodata_table] = net[geodata_table].dropna(how='all')
+            net[geodata_table] = net[geodata_table].loc[net[geodata_table] != 'null']
         else:
             raise UserWarning(f"Table {geodata_table} is not empty - use overwrite=True to overwrite existing geodata")
 
@@ -249,7 +249,7 @@ def _prepare_geodata_table(net, geodata_table, overwrite):
 
 def fuse_geodata(net):
     mg = create_nxgraph(net, include_lines=False, include_impedances=False, respect_switches=False)
-    geocoords = set(net.bus.dropna(subset=['geo']).index)
+    geocoords = set(net.bus.loc[net.bus.geo != 'null'].index)
     for area in connected_components(mg):
         if len(area & geocoords) > 1:
             geo = net.bus.loc[list(area & geocoords), 'geo'].apply(geojson.loads)

@@ -23,7 +23,7 @@ def test_create_generic_coordinates_igraph():
     net = create_test_network()
     net.bus = net.bus.drop("geo", axis=1)
     create_generic_coordinates(net, library="igraph")
-    assert len(net.bus.geo.dropna()) == len(net.bus)
+    assert len(net.bus.geo.loc[net.bus.geo != 'null']) == len(net.bus)
 
 
 @pytest.mark.xfail(reason="The current implementation is not working properly, as multigraph edges "

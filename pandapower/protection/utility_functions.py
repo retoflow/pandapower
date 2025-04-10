@@ -50,7 +50,7 @@ warnings.filterwarnings('ignore')
 
 def _get_coords_from_bus_idx(net: pandapowerNet, bus_idx: pd.Index) -> List[Tuple[float, float]]:
     try:
-        bl = net.bus.dropna(subset=["geo"]).loc[bus_idx, 'geo']
+        bl = net.bus.geo.loc[net.bus.geo != 'null'].loc[bus_idx]
         if isinstance(bl, pd.Series):
             return bl.apply(geojson.loads).apply(geojson.utils.coords).apply(next).to_list()
         else:
@@ -62,7 +62,7 @@ def _get_coords_from_bus_idx(net: pandapowerNet, bus_idx: pd.Index) -> List[Tupl
 
 def _get_coords_from_line_idx(net: pandapowerNet, line_idx: pd.Index) -> List[Tuple[float, float]]:
     try:
-        ll = net.line.dropna(subset=["geo"]).loc[line_idx, 'geo']
+        ll = net.line.geo.loc[net.line.geo != 'null'].loc[line_idx]
         if isinstance(ll, pd.Series):
             return ll.apply(geojson.loads).apply(geojson.utils.coords).apply(next).to_list()
         else:
@@ -235,7 +235,7 @@ def fuse_bus_switches(net, bus_switches):
 
 
 def get_fault_annotation(net: pandapowerNet, fault_current: float = .0, font_size_bus: float = 0.06) -> PatchCollection:
-    max_bus_idx = max(net.bus.dropna(subset=['geo']).index)
+    max_bus_idx = max(net.bus.geo.loc[net.bus.geo != 'null'].index)
     fault_text = f'\tI_sc = {fault_current}kA'
 
     fault_geo_x_y: Tuple[float, float] = next(geojson.utils.coords(geojson.loads(net.bus.geo.at[max_bus_idx])))
@@ -253,7 +253,7 @@ def get_fault_annotation(net: pandapowerNet, fault_current: float = .0, font_siz
 
 
 def get_sc_location_annotation(net: pandapowerNet, sc_location: float, font_size_bus: float = 0.06) -> PatchCollection:
-    max_bus_idx = max(net.bus.dropna(subset=['geo']).index)
+    max_bus_idx = max(net.bus.geo.loc[net.bus.geo != 'null'].index)
     sc_text = f'\tsc_location: {sc_location * 100}%'
 
     # list of new geo data for line (middle of  position of switch)
@@ -399,14 +399,14 @@ def plot_tripped_grid(net, trip_decisions, sc_location, bus_size=0.055, plot_ann
 
         # Bus Annotatations
         bus_text = []
-        for i in net.bus.geo.dropna().index:
+        for i in net.bus.geo.loc[net.bus.geo != 'null'].index:
             bus_texts = 'bus_' + str(i)
 
             bus_text.append(bus_texts)
 
         bus_text = bus_text[:-1]
 
-        bus_geodata = net.bus.geo.dropna().apply(geojson.loads).apply(geojson.utils.coords).apply(next).to_list()
+        bus_geodata = net.bus.geo.apply(geojson.loads).dropna().apply(geojson.utils.coords).apply(next).to_list()
 
         # placing bus
         bus_index = [(x[0] - 0.11, x[1] + 0.095) for x in bus_geodata]
@@ -602,7 +602,7 @@ def plot_tripped_grid_protection_device(net, trip_decisions, sc_location, sc_bus
         bus_annotate = create_annotation_collection(texts=bus_text, coords=bus_geodata, size=0.06, prop=None)
         collection.append(bus_annotate)
 
-        max_bus_idx = max(net.bus.dropna(subset=['geo']).index)
+        max_bus_idx = max(net.bus.loc[net.bus.geo != 'null'].index)
 
         # Short circuit annotations
         collection.append(get_fault_annotation(net, fault_current))

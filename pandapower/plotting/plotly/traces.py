@@ -591,9 +591,9 @@ def _create_branch_trace(net, branches=None, use_branch_geodata=True, respect_se
                                                                net[branch_element].index)]
     else:
         branches_with_geodata = branches_to_plot['from_' + node_element].isin(
-            net[node_element].dropna(subset=["geo"]).index) & \
+            net[node_element].loc[net[node_element].geo != 'null'].index) & \
                                 branches_to_plot['to_' + node_element].isin(
-                                    net[node_element].dropna(subset=["geo"]).index)
+                                    net[node_element].loc[net[node_element].geo != 'null'].index)
         branches_to_plot = branches_to_plot.loc[branches_with_geodata]
     cmap_branches = None
     if cmap is not None:
@@ -778,14 +778,14 @@ def create_trafo_trace(net, trafos=None, color='green', trafotype='2W', width=5,
     if trafotype == '2W':
         trafotable = 'trafo'
 
-        trafo_buses_with_geodata = net.trafo.hv_bus.isin(net.bus.geo.dropna().index) & \
-                                   net.trafo.lv_bus.isin(net.bus.geo.dropna().index)
+        trafo_buses_with_geodata = net.trafo.hv_bus.isin(net.bus.geo.loc[net.bus.geo != 'null'].index) & \
+                                   net.trafo.lv_bus.isin(net.bus.geo.loc[net.bus.geo != 'null'].index)
         connections = [['hv_bus', 'lv_bus']]
     elif trafotype == '3W':
         trafotable = 'trafo3w'
-        trafo_buses_with_geodata = net.trafo3w.hv_bus.isin(net.bus.dropna(subset=["geo"]).index) & \
-                                   net.trafo3w.mv_bus.isin(net.bus.dropna(subset=["geo"]).index) & \
-                                   net.trafo3w.lv_bus.isin(net.bus.dropna(subset=["geo"]).index)
+        trafo_buses_with_geodata = net.trafo3w.hv_bus.isin(net.bus.loc[net.bus.geo != 'null'].index) & \
+                                   net.trafo3w.mv_bus.isin(net.bus.loc[net.bus.geo != 'null'].index) & \
+                                   net.trafo3w.lv_bus.isin(net.bus.loc[net.bus.geo != 'null'].index)
         connections = [['hv_bus', 'lv_bus'], ['hv_bus', 'mv_bus'], ['mv_bus', 'lv_bus']]
 
     else:

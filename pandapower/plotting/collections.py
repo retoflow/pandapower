@@ -838,7 +838,7 @@ def create_trafo_collection(net, trafos=None, picker=False, size=None, infofunc=
     trafos = get_index_array(trafos, net.trafo.index)
 
     if bus_geodata is None:
-        bus_geodata = net.bus.geo.dropna()
+        bus_geodata = net.bus.geo.loc[net.bus.geo != 'null']
 
     in_geodata = (net.trafo.hv_bus.loc[trafos].isin(bus_geodata.index) &
                   net.trafo.lv_bus.loc[trafos].isin(bus_geodata.index))
@@ -903,7 +903,7 @@ def create_trafo3w_collection(net, trafo3ws=None, picker=False, infofunc=None, c
     trafo3ws = get_index_array(trafo3ws, net.trafo3w.index)
 
     if bus_geodata is None:
-        bus_geodata = net.bus.geo.dropna()
+        bus_geodata = net.bus.geo.loc[net.bus.geo != 'null']
 
     in_geodata = (net.trafo3w.hv_bus.loc[trafo3ws].isin(bus_geodata.index) &
                   net.trafo3w.mv_bus.loc[trafo3ws].isin(bus_geodata.index) &
@@ -1008,11 +1008,11 @@ def create_vsc_collection(net, vscs=None, picker=False, size=None, infofunc=None
 
     if bus_geodata is None:
         # bus_geodata = net["bus_geodata"]
-        bus_geodata = net.bus.geo.dropna()
+        bus_geodata = net.bus.geo.loc[net.bus.geo != 'null']
 
     if bus_dc_geodata is None:
         # bus_dc_geodata = net["bus_dc_geodata"]
-        bus_dc_geodata = net.bus_dc.geo.dropna()
+        bus_dc_geodata = net.bus_dc.geo.loc[net.bus.geo != 'null']
 
     in_geodata = (net.vsc.bus.loc[vscs].isin(bus_geodata.index) &
                   net.vsc.bus_dc.loc[vscs].isin(bus_dc_geodata.index))
@@ -1093,11 +1093,11 @@ def create_vsc_connection_collection(net, vscs=None, bus_geodata=None, bus_dc_ge
 
     if bus_geodata is None:
         # bus_geodata = net["bus_geodata"]
-        bus_geodata = net.bus.geo.dropna()
+        bus_geodata = net.bus.geo.loc[net.bus.geo != 'null']
 
     if bus_dc_geodata is None:
         bus_dc_geodata = net["bus_dc_geodata"]
-        bus_dc_geodata = net.bus_dc.geo.dropna()
+        bus_dc_geodata = net.bus_dc.geo.loc[net.bus.geo != 'null']
 
     in_geodata = (net.vsc.bus.loc[vscs].isin(bus_geodata.index) &
                   net.vsc.bus_dc.loc[vscs].isin(bus_dc_geodata.index))
@@ -1441,7 +1441,7 @@ def create_line_switch_collection(net, switches=None, size=1, distance_to_bus=3,
         use_bus_geodata = False
 
         if use_line_geodata:
-            if line.name in net.line.geo.dropna().index:
+            if line.name in net.line.geo.loc[net.line.geo != 'null'].index:
                 line_coords = net.line.loc[line.name, "geo"]
                 # check, which end of the line is nearer to the switch bus
                 intersection = position_on_busbar(net, sb, busbar_coords=line_coords)
