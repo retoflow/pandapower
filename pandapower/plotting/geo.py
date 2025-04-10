@@ -510,9 +510,11 @@ def convert_geodata_to_geojson(
         for i, geo in geo_df.iterrows():
             if not drop_invalid_geodata and ((not _is_valid_number(geo.x)) | (not _is_valid_number(geo.y))):
                 raise ValueError("There exists invalid bus geodata at index %s. Please clean up your data first or "
-                                 "set 'drop_invalid_geodata' to True"%i)
+                                 "set 'drop_invalid_geodata' to True" %i)
             elif _is_valid_number(geo.x) and _is_valid_number(geo.y):
                 df.loc[i, "geo"] = f'{{"coordinates": [{float(geo[a])}, {float(geo[b])}], "type": "Point"}}'
+            else:
+                logger.warning("bus geodata at index %s is invalid and replaced by 'null'" %i)
 
     ldf["geo"] = 'null'
     for i, geo in geo_ldf.iterrows():
@@ -525,6 +527,8 @@ def convert_geodata_to_geojson(
                                  "set 'drop_invalid_geodata' to True"%i)
             elif _is_valid_number(x) and _is_valid_number(y):
                 coords += [[float(y), float(x)] if lonlat else [float(x), float(y)]]
+            else:
+                logger.warning("line geodata at index %s is invalid and replaced by 'null'" %i)
         ls = f'{{"coordinates": {coords}, "type": "LineString"}}'
         ldf["geo"] = ldf["geo"].astype(object)
         ldf.loc[i, "geo"] = ls
