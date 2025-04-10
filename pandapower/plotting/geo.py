@@ -481,7 +481,8 @@ def convert_geodata_to_geojson(
         node_name: str = 'bus',
         branch_name: str = 'line',
         delete: bool = True,
-        lonlat: bool = False) -> None:
+        lonlat: bool = False,
+        validate_geodata: bool = True) -> None:
     """
     Converts bus_geodata and line_geodata to bus.geo and line.geo column entries.
 
@@ -507,7 +508,7 @@ def convert_geodata_to_geojson(
     df["geo"] = 'null'
     if not geo_df.empty:
         for i, geo in geo_df.iterrows():
-            if _is_valid_number(geo.x) and _is_valid_number(geo.y):
+            if not validate_geodata | (_is_valid_number(geo.x) and _is_valid_number(geo.y)):
                 df.loc[i, "geo"] = f'{{"coordinates": [{float(geo[a])}, {float(geo[b])}], "type": "Point"}}'
 
     ldf["geo"] = 'null'
