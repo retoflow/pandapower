@@ -14,7 +14,7 @@ import math
 import pandas as pd
 from numpy import array
 
-from pandapower.auxiliary import soft_dependency_error, pandapowerNet
+from pandapower.auxiliary import soft_dependency_error, pandapowerNet, ADict
 
 # get logger (same as in simple_plot)
 try:
@@ -227,26 +227,18 @@ def convert_epsg_bus_geodata(net, epsg_in=4326, epsg_out=31467):
     return net
 
 
-def convert_crs(net: pandapowerNet, epsg_in=4326, epsg_out=31467):
-    """
-    This function works for pandapowerNet. Documentation will refer to names from pandapower.
-    Converts bus and line geodata in net from epsg_in to epsg_out
-    if GeoDataFrame data is present convert_geodata_to_gis should be used to update geometries after crs conversion
-
-    :param net: The pandapower network
-    :type net: pandapowerNet
-    :param epsg_in: current epsg projection
-    :type epsg_in: int, default 4326 (= WGS84)
-    :param epsg_out: epsg projection to be transformed to
-    :type epsg_out: int, default 31467 (= Gauss-Krüger Zone 3)
-    :return: net - the given pandapower network (no copy!)
-    """
-
+def abstract_convert_crs(net: ADict,
+                         node_name: str = 'bus',
+                         branch_name: str = 'line',
+                         epsg_in: int = 4326,
+                         epsg_out: int = 31467):
     if epsg_in == epsg_out:
         return
 
-    if ('geo' in net.bus and not all(net.bus.geo.isna()) and
-            'geo' in net.line and not all(net.line.geo.isna()) and
+    node_geo_name = node_name + "_geodata"
+    branch_geo_name = branch_name + "_geodata"
+    if ('geo' in net[node_name] and not all(net[node_name].geo.isna()) and
+            'geo' in net[branch_name] and not all(net[branch_name].geo.isna()) and
             epsg_out == 4326):
         # by definition geojson is in wgs84
         return
@@ -265,17 +257,83 @@ def convert_crs(net: pandapowerNet, epsg_in=4326, epsg_out=31467):
     def _geo_branch_transformer(r):
         return list(transformer.itransform(r))
 
-    net.bus_geodata = net.bus_geodata.apply(lambda r: _geo_node_transformer(r), axis=1)
-    net.line_geodata.coords = net.line_geodata.coords.apply(lambda r: _geo_branch_transformer(r))
-    net.bus_geodata.attrs = {"crs": f"EPSG:{epsg_out}"}
-    net.line_geodata.attrs = {"crs": f"EPSG:{epsg_out}"}
+    net[node_geo_name] = net[node_geo_name].apply(lambda r: _geo_node_transformer(r), axis=1)
+    net[branch_geo_name].coords = net[branch_geo_name].coords.apply(lambda r: _geo_branch_transformer(r))
+    net[node_geo_name].attrs = {"crs": f"EPSG:{epsg_out}"}
+    net[branch_geo_name].attrs = {"crs": f"EPSG:{epsg_out}"}
+
+
+def convert_crs(net: pandapowerNet,
+                epsg_in: int = 4326,
+                epsg_out: int = 31467):
+    """
+    This function works for pandapower network. Documentation will refer to names from pandapower.
+    Converts bus and line geodata in net from epsg_in to epsg_out
+    if GeoDataFrame data is present convert_geodata_to_gis should be used to update geometries after crs conversion
+
+    :param net: network
+    :type net: ADict
+    :param epsg_in: current epsg projection
+    :type epsg_in: int, default 4326 (= WGS84)
+    :param epsg_out: epsg projection to be transformed to
+    :type epsg_out: int, default 31467 (= Gauss-Krüger Zone 3)
+    :return: net - the given pandapower network (no copy!)
+    """
+    abstract_convert_crs(net, 'bus', 'line', epsg_in, epsg_out)
+
+
+def dump_to_geojson_node_branch(
+        net: ADict,
+        node_geodata: pd.Series,
+        branch_geodata: pd.Series,
+        node_name: str = 'bus',
+        branch_name: str = 'line',
+        nodes: Union[bool, List[int]] = False,
+        branches: Union[bool, List[int]] = False):
+    def update_props(r: pd.Series) -> None:
+        if r.name not in props:
+            props[r.name] = {}
+        props[r.name].update(r.to_dict())
+
+    features = []
+    elements = {node_name: nodes, branch_name: branches}
+    geodata = {node_name: node_geodata, branch_name: branch_geodata}
+    missing_geom = {node_name: 0, branch_name: 0}
+    # build geojson features for nodes and branches
+
+    for name in [node_name, branch_name]:
+        element = elements[name]
+        if element:
+            props = {}
+            for table in [name, 'res_' + name]:
+                if table not in net.keys():
+                    continue
+
+                tempdf = net[table].copy(deep=True)
+                tempdf['pp_type'] = name
+                tempdf['pp_index'] = tempdf.index
+                tempdf.index = tempdf.apply(lambda r: f"{r['pp_type']}-{r['pp_index']}", axis=1)
+                tempdf.drop(columns=['geo'], inplace=True, axis=1, errors='ignore')
+
+                tempdf.apply(update_props, axis=1)
+            if isinstance(element, bool):
+                iterator = geodata[name].items()
+            else:
+                iterator = geodata[name].loc[element].items()
+            for ind, geom in iterator:
+                if geom == "null":
+                    missing_geom[name] += 1
+                    continue
+                uid = f"{'bus'}-{ind}"
+                features.append(geojson.Feature(geometry=geojson.loads(geom), id=uid, properties=props[uid]))
+    return features, missing_geom[node_name], missing_geom[branch_name]
 
 
 def dump_to_geojson(
         net: pandapowerNet,
         nodes: Union[bool, List[int]] = False,
         branches: Union[bool, List[int]] = False,
-        switches: Union[bool,  List[int]] = False,
+        switches: Union[bool, List[int]] = False,
         trafos: Union[bool, List[int]] = False,
         t_is_3w: bool = False
 ) -> geojson.FeatureCollection:
@@ -313,12 +371,16 @@ def dump_to_geojson(
             raise UserWarning("""The supplied network uses an outdated geodata format. Please update your geodata by
                                  \rrunning `pandapower.plotting.geo.convert_geodata_to_geojson(net)`""")
         else:
-            node_geodata = net.bus.geo
-            branch_geodata = net.line.geo
+            bus_geodata = net.bus.geo
+            line_geodata = net.line.geo
 
     except UserWarning as e:
         logger.warning(e)
         return geojson.FeatureCollection([])
+
+    missing_geom: List[int] = [0, 0, 0, 0]  # missing nodes, branches, switches, trafos
+    features, missing_geom[0], missing_geom[1] = dump_to_geojson_node_branch(
+        net, bus_geodata, line_geodata, 'bus', 'line', nodes, branches)
 
     def _get_props(r, c, p) -> None:
         for col in c:
@@ -328,64 +390,6 @@ def dump_to_geojson(
                     p[col] = None
             except (ValueError, TypeError):
                 p[col] = str(r[col])
-
-    def update_props(r: pd.Series) -> None:
-        if r.name not in props:
-            props[r.name] = {}
-        props[r.name].update(r.to_dict())
-
-    missing_geom: List[int] = [0, 0, 0, 0]  # missing nodes, branches, switches, trafos
-    features = []
-    # build geojson features for nodes
-    if nodes:
-        props = {}
-        for table in ['bus', 'res_bus']:
-            if table not in net.keys():
-                continue
-
-            tempdf = net[table].copy(deep=True)
-            tempdf['pp_type'] = 'bus'
-            tempdf['pp_index'] = tempdf.index
-            tempdf.index = tempdf.apply(lambda r: f"{r['pp_type']}-{r['pp_index']}", axis=1)
-            tempdf.drop(columns=['geo'], inplace=True, axis=1, errors='ignore')
-
-            tempdf.apply(update_props, axis=1)
-        if isinstance(nodes, bool):
-            iterator = node_geodata.items()
-        else:
-            iterator = node_geodata.loc[nodes].items()
-        for ind, geom in iterator:
-            if geom == "null":
-                missing_geom[0] += 1
-                continue
-            uid = f"{'bus'}-{ind}"
-            features.append(geojson.Feature(geometry=geojson.loads(geom), id=uid, properties=props[uid]))
-
-    # build geojson features for branches
-    if branches:
-        props = {}
-        for table in ['line', 'res_line']:
-            if table not in net.keys():
-                continue
-
-            tempdf = net[table].copy(deep=True)
-            tempdf['pp_type'] = 'line'
-            tempdf['pp_index'] = tempdf.index
-            tempdf.index = tempdf.apply(lambda r: f"{r['pp_type']}-{r['pp_index']}", axis=1)
-            tempdf.drop(columns=['geo'], inplace=True, axis=1, errors='ignore')
-
-            tempdf.apply(update_props, axis=1)
-
-        if isinstance(branches, bool):
-            iterator = branch_geodata.items()
-        else:
-            iterator = branch_geodata.loc[branches].items()
-        for ind, geom in iterator:
-            if geom == "null":
-                missing_geom[1] += 1
-                continue
-            uid = f"{'line'}-{ind}"
-            features.append(geojson.Feature(geometry=geojson.loads(geom), id=uid, properties=props[uid]))
 
     if switches:
         if isinstance(switches, bool):
@@ -414,28 +418,28 @@ def dump_to_geojson(
                     continue
                 features.append(geojson.Feature(geometry=geom, id=uid, properties=prop))
 
-        if trafos:
-            t_type = 'trafo3w' if t_is_3w else 'trafo'
-            if isinstance(trafos, bool):
-                trafos = net[t_type].index
-            if t_type in net.keys():
-                cols = net[t_type].columns
-                for ind, row in net[t_type].loc[trafos].iterrows():
-                    prop = {
-                        'pp_type': t_type,
-                        'pp_index': ind,
-                    }
-                    uid = f"{t_type}-{ind}"
-                    _get_props(row, cols, prop)
+    if trafos:
+        t_type = 'trafo3w' if t_is_3w else 'trafo'
+        if isinstance(trafos, bool):
+            trafos = net[t_type].index
+        if t_type in net.keys():
+            cols = net[t_type].columns
+            for ind, row in net[t_type].loc[trafos].iterrows():
+                prop = {
+                    'pp_type': t_type,
+                    'pp_index': ind,
+                }
+                uid = f"{t_type}-{ind}"
+                _get_props(row, cols, prop)
 
-                    # getting geodata for switches
-                    geom = geojson.loads(net.bus.geo.at[row.lv_bus])
-                    if isinstance(geom, geojson.LineString):
-                        logger.warning(f"LineString geometry not supported for type '{t_type}'. Skipping trafo {ind}")
-                    if geom == "null":
-                        missing_geom[3] += 1
-                        continue
-                    features.append(geojson.Feature(geometry=geom, id=uid, properties=prop))
+                # getting geodata for trafos
+                geom = geojson.loads(net.bus.geo.at[row.lv_bus])
+                if isinstance(geom, geojson.LineString):
+                    logger.warning(f"LineString geometry not supported for type '{t_type}'. Skipping trafo {ind}")
+                if geom == "null":
+                    missing_geom[3] += 1
+                    continue
+                features.append(geojson.Feature(geometry=geom, id=uid, properties=prop))
 
     if any(missing_geom):
         missing_str = []
@@ -451,11 +455,11 @@ def dump_to_geojson(
 
     # find and set crs if available
     crs_node = None
-    if nodes and "crs" in node_geodata.attrs:
-        crs_node = node_geodata.attrs["crs"]
+    if nodes and "crs" in bus_geodata.attrs:
+        crs_node = bus_geodata.attrs["crs"]
     crs_branch = None
-    if branches and "crs" in branch_geodata.attrs:
-        crs_branch = branch_geodata.attrs["crs"]
+    if branches and "crs" in line_geodata.attrs:
+        crs_branch = line_geodata.attrs["crs"]
 
     crs = {
         "type": "name",
@@ -476,10 +480,60 @@ def dump_to_geojson(
     return geojson.FeatureCollection(features)
 
 
-def convert_geodata_to_geojson(
-        net: pandapowerNet,
+def abstract_convert_geodata_to_geojson(
+        net: ADict,
         node_name: str = 'bus',
         branch_name: str = 'line',
+        delete: bool = True,
+        lonlat: bool = False,
+        drop_invalid_geodata: bool = True) -> None:
+    df = net[node_name]
+    ldf = net[branch_name]
+    bus_geo_name = node_name + '_geodata'
+    line_geo_name = branch_name + '_geodata'
+    geo_df = net[bus_geo_name] if (
+                hasattr(net, bus_geo_name) and isinstance(net[bus_geo_name], pd.DataFrame)) else pd.DataFrame()
+    geo_ldf = net[line_geo_name] if (
+                hasattr(net, line_geo_name) and isinstance(net[line_geo_name], pd.DataFrame)) else pd.DataFrame()
+
+    a, b = "yx" if lonlat else "xy"  # substitute x and y with a and b to reverse them if necessary
+    if not geo_df.empty:
+        df["geo"] = 'null'
+        for i, geo in geo_df.iterrows():
+            if not drop_invalid_geodata and ((not _is_valid_number(geo.x)) | (not _is_valid_number(geo.y))):
+                raise ValueError("There exists invalid bus geodata at index %s. Please clean up your data first or "
+                                 "set 'drop_invalid_geodata' to True" % i)
+            elif _is_valid_number(geo.x) and _is_valid_number(geo.y):
+                df.loc[i, "geo"] = f'{{"coordinates": [{float(geo[a])}, {float(geo[b])}], "type": "Point"}}'
+            else:
+                logger.warning("bus geodata at index %s is invalid and replaced by 'null'" % i)
+
+    if not geo_ldf.empty:
+        ldf["geo"] = 'null'
+        for i, geo in geo_ldf.iterrows():
+            if not geo['coords']:
+                continue
+            coords: List[List[float]] = []
+            for x, y in geo.coords:
+                if not drop_invalid_geodata and ((not _is_valid_number(x)) | (not _is_valid_number(y))):
+                    raise ValueError(
+                        "There exists invalid line geodata at index %s. Please clean up your data first or "
+                        "set 'drop_invalid_geodata' to True" % i)
+                elif _is_valid_number(x) and _is_valid_number(y):
+                    coords += [[float(y), float(x)] if lonlat else [float(x), float(y)]]
+                else:
+                    logger.warning("line geodata at index %s is invalid and replaced by 'null'" % i)
+            ls = f'{{"coordinates": {coords}, "type": "LineString"}}'
+            ldf["geo"] = ldf["geo"].astype(object)
+            ldf.loc[i, "geo"] = ls
+
+    if delete:
+        if hasattr(net, bus_geo_name): del net[bus_geo_name]
+        if hasattr(net, line_geo_name): del net[line_geo_name]
+
+
+def convert_geodata_to_geojson(
+        net: pandapowerNet,
         delete: bool = True,
         lonlat: bool = False,
         drop_invalid_geodata: bool = True) -> None:
@@ -495,48 +549,11 @@ def convert_geodata_to_geojson(
     :type delete: bool, default True
     :param lonlat: If True, the coordinates are expected to be in lonlat format (x=lon, y=lat)
     :type lonlat: bool, default False
+    :param drop_invalid_geodata: If True, entries containing invalid geo coordinates e.g. None, np.nan will be dropped
+    :type drop_invalid_geodata: bool, default True
     """
+    abstract_convert_geodata_to_geojson(net, 'bus', 'line', delete, lonlat, drop_invalid_geodata)
 
-    df = net[node_name]
-    ldf = net[branch_name]
-    bus_geo_name = node_name + '_geodata'
-    line_geo_name = branch_name + '_geodata'
-    geo_df = net[bus_geo_name] if (hasattr(net, bus_geo_name) and isinstance(net[bus_geo_name], pd.DataFrame)) else pd.DataFrame()
-    geo_ldf = net[line_geo_name] if (hasattr(net, line_geo_name) and isinstance(net[line_geo_name], pd.DataFrame)) else pd.DataFrame()
-
-    a, b = "yx" if lonlat else "xy"  # substitute x and y with a and b to reverse them if necessary
-    if not geo_df.empty:
-        df["geo"] = 'null'
-        for i, geo in geo_df.iterrows():
-            if not drop_invalid_geodata and ((not _is_valid_number(geo.x)) | (not _is_valid_number(geo.y))):
-                raise ValueError("There exists invalid bus geodata at index %s. Please clean up your data first or "
-                                 "set 'drop_invalid_geodata' to True" %i)
-            elif _is_valid_number(geo.x) and _is_valid_number(geo.y):
-                df.loc[i, "geo"] = f'{{"coordinates": [{float(geo[a])}, {float(geo[b])}], "type": "Point"}}'
-            else:
-                logger.warning("bus geodata at index %s is invalid and replaced by 'null'" %i)
-
-    if not geo_ldf.empty:
-        ldf["geo"] = 'null'
-        for i, geo in geo_ldf.iterrows():
-            if not geo['coords']:
-                continue
-            coords: List[List[float]] = []
-            for x,y in geo.coords:
-                if not drop_invalid_geodata and ((not _is_valid_number(x)) | (not _is_valid_number(y))):
-                    raise ValueError("There exists invalid line geodata at index %s. Please clean up your data first or "
-                                     "set 'drop_invalid_geodata' to True"%i)
-                elif _is_valid_number(x) and _is_valid_number(y):
-                    coords += [[float(y), float(x)] if lonlat else [float(x), float(y)]]
-                else:
-                    logger.warning("line geodata at index %s is invalid and replaced by 'null'" %i)
-            ls = f'{{"coordinates": {coords}, "type": "LineString"}}'
-            ldf["geo"] = ldf["geo"].astype(object)
-            ldf.loc[i, "geo"] = ls
-
-    if delete:
-        if hasattr(net, bus_geo_name):del net[bus_geo_name]
-        if hasattr(net, line_geo_name): del net[line_geo_name]
 
 def _is_valid_number(value):
     try:
@@ -545,10 +562,22 @@ def _is_valid_number(value):
     except (ValueError, TypeError):
         return False
 
-def convert_gis_to_geojson(
+
+def abstract_convert_gis_to_geojson(
         net: pandapowerNet,
         node_name: str = 'bus',
         branch_name: str = 'line',
+        delete: bool = True) -> None:
+    net[node_name]["geo"] = _transform_node_geometry_to_geojson(net[node_name + "_geodata"])
+    net[branch_name]["geo"] = _transform_branch_geometry_to_geojson(net[branch_name + "_geodata"])
+
+    if delete:
+        del net[node_name + "_geodata"]
+        del net[branch_name + "_geodata"]
+
+
+def convert_gis_to_geojson(
+        net: pandapowerNet,
         delete: bool = True) -> None:
     """
     Transforms the bus and line geodataframes of a net into a geojson object.
@@ -559,11 +588,4 @@ def convert_gis_to_geojson(
     :type delete: bool, default True
     :return: No output.
     """
-
-    net[node_name]["geo"] = _transform_node_geometry_to_geojson(net[node_name + "_geodata"])
-    net[branch_name]["geo"] = _transform_branch_geometry_to_geojson(net[branch_name + "_geodata"])
-
-    if delete:
-        del net[node_name + "_geodata"]
-        del net[branch_name + "_geodata"]
-
+    abstract_convert_crs(net, 'bus', 'line', delete)
