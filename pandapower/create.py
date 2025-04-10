@@ -861,35 +861,14 @@ def create_buses(net, nr_buses, vn_kv, index=None, name=None, type="b", geodata=
     """
     index = _get_multiple_index_with_check(net, "bus", index, nr_buses)
 
-    def _geodata_to_geo_series(data: Union[Iterable[Tuple[float, float]], Tuple[int, int]]) -> List[str]:
-        geo = []
-        for g in data:
-            if isinstance(g, tuple):
-                if len(g) != 2:
-                    raise ValueError("geodata tuples must be of length 2")
-                elif not _is_valid_number(g[0]):
-                    raise UserWarning("geodata x must be a valid number")
-                elif not _is_valid_number(g[1]):
-                    raise UserWarning("geodata y must be a valid number")
-                else:
-                    x, y = g
-                    geo.append(f'{{"coordinates": [{x}, {y}], "type": "Point"}}')
-            else:
-                raise ValueError("geodata must be iterable of tuples of (x, y) coordinates")
-        if len(geo) == 1:
-            geo = [geo[0]] * nr_buses
-        if len(geo) != nr_buses:
-            raise ValueError("geodata must be a single point or have the same length as nr_buses")
-        return geo
-
     if geodata:
         if isinstance(geodata, tuple) and (isinstance(geodata[0], int) or isinstance(geodata[0], float)):
-            geo = _geodata_to_geo_series([geodata])
+            geo = _geodata_to_geo_series([geodata], nr_buses)
         else:
             assert hasattr(geodata, "__iter__"), "geodata must be an iterable"
-            geo = _geodata_to_geo_series(geodata)
+            geo = _geodata_to_geo_series(geodata, nr_buses)
     else:
-        geo = [None] * nr_buses
+        geo = ['null'] * nr_buses
 
     if coords:
         raise UserWarning("busbar plotting is not implemented fully and will likely be removed in the future")
@@ -898,7 +877,6 @@ def create_buses(net, nr_buses, vn_kv, index=None, name=None, type="b", geodata=
     _add_to_entries_if_not_nan(net, "bus", entries, index, "min_vm_pu", min_vm_pu)
     _add_to_entries_if_not_nan(net, "bus", entries, index, "max_vm_pu", max_vm_pu)
     _set_multiple_entries(net, "bus", index, **entries, **kwargs)
-    net.bus.loc[net.bus.geo == "", "geo"] = None  # overwrite
     # empty_defaults_per_dtype() applied in _set_multiple_entries()
 
     return index
@@ -952,25 +930,47 @@ def create_buses_dc(net, nr_buses_dc, vn_kv, index=None, name=None, type="b", ge
     """
     index = _get_multiple_index_with_check(net, "bus_dc", index, nr_buses_dc)
 
-    entries = {"vn_kv": vn_kv, "type": type, "zone": zone, "in_service": in_service, "name": name}
+    if geodata:
+        if isinstance(geodata, tuple) and (isinstance(geodata[0], int) or isinstance(geodata[0], float)):
+            geo = _geodata_to_geo_series([geodata], nr_buses_dc)
+        else:
+            assert hasattr(geodata, "__iter__"), "geodata must be an iterable"
+            geo = _geodata_to_geo_series(geodata, nr_buses_dc)
+    else:
+        geo = ['null'] * nr_buses_dc
+
+    entries = {"vn_kv": vn_kv, "type": type, "zone": zone, "in_service": in_service, "name": name, "geo": geo}
     _add_to_entries_if_not_nan(net, "bus_dc", entries, index, "min_vm_pu", min_vm_pu)
     _add_to_entries_if_not_nan(net, "bus_dc", entries, index, "max_vm_pu", max_vm_pu)
     _set_multiple_entries(net, "bus_dc", index, **entries, **kwargs)
 
-    if geodata is not None:
-        # works with a 2-tuple or a matching array
-        net.bus_dc_geodata = pd.concat([
-            net.bus_dc_geodata,
-            pd.DataFrame(zeros((len(index), len(net.bus_dc_geodata.columns)), dtype=np.int64),
-                         index=index, columns=net.bus_dc_geodata.columns)])
-        net.bus_dc_geodata.loc[index, :] = nan
-        net.bus_dc_geodata.loc[index, ["x", "y"]] = geodata
-    if coords is not None:
-        net.bus_dc_geodata = pd.concat(
-            [net.bus_dc_geodata, pd.DataFrame(index=index, columns=net.bus_dc_geodata.columns)])
-        net["bus_dc_geodata"].loc[index, "coords"] = coords
+    if coords:
+        raise UserWarning("busbar plotting is not implemented fully and will likely be removed in the future")
+
     return index
 
+
+def _geodata_to_geo_series(data: Union[Iterable[Tuple[float, float]], Tuple[int, int]],
+                           nr_buses: int) -> List[str]:
+    geo = []
+    for g in data:
+        if isinstance(g, tuple):
+            if len(g) != 2:
+                raise ValueError("geodata tuples must be of length 2")
+            elif not _is_valid_number(g[0]):
+                raise UserWarning("geodata x must be a valid number")
+            elif not _is_valid_number(g[1]):
+                raise UserWarning("geodata y must be a valid number")
+            else:
+                x, y = g
+                geo.append(f'{{"coordinates": [{x}, {y}], "type": "Point"}}')
+        else:
+            raise ValueError("geodata must be iterable of tuples of (x, y) coordinates")
+    if len(geo) == 1:
+        geo = [geo[0]] * nr_buses
+    if len(geo) != nr_buses:
+        raise ValueError("geodata must be a single point or have the same length as nr_buses")
+    return geo
 
 def create_load(net, bus, p_mw, q_mvar=0, const_z_percent=0, const_i_percent=0, sn_mva=nan,
                 name=None, scaling=1., index=None, in_service=True, type='wye', max_p_mw=nan,
