@@ -263,9 +263,7 @@ def from_dict_of_dfs(dodfs, net=None):
             # convert geodata to geojson
             if item in ["bus", "line"]:
                 if "geo" in table.columns:
-                    table.geo = table.geo.apply(
-                        lambda x: geojson.loads(x, cls=PPJSONDecoder) if pd.notna(x) else x
-                    )
+                    table.geo = table.geo.apply(lambda x: geojson.loads(x, cls=PPJSONDecoder))
         # set the index to be Int
         try:
             net[item].set_index(net[item].index.astype(np.int64), inplace=True)
@@ -573,9 +571,6 @@ class FromSerializableRegistry():
             else:
                 if column_names is not None:
                     df.columns.names = column_names
-
-        if 'geo' in df.columns:
-            df['geo'] = df['geo'].dropna().apply(json.dumps).apply(geojson.loads)
 
         df_obj = df.select_dtypes(include=['object'])
         for col in df_obj:

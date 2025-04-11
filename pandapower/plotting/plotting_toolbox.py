@@ -186,8 +186,8 @@ def coords_from_node_geodata(element_indices, from_nodes, to_nodes, node_geodata
         )
 
     # reduction to not nans
-    fb_geo_is_nan = node_geodata.loc[fb_with_geo].isnull().values
-    tb_geo_is_nan = node_geodata.loc[tb_with_geo].isnull().values
+    fb_geo_is_nan = (node_geodata.loc[fb_with_geo] == 'null').values
+    tb_geo_is_nan = (node_geodata.loc[tb_with_geo] == 'null').values
     not_nan = ~(fb_geo_is_nan | tb_geo_is_nan)
     if n_nans := len(not_nan) - sum(not_nan):
         logger.warning(
@@ -220,16 +220,17 @@ def set_line_geodata_from_bus_geodata(net, line_index=None, overwrite=False, ign
     :param overwrite: whether the existing coordinates in net.line.geo must be overwritten
     :return: None
     """
-    if 'geo' not in net.bus.columns or net.bus.geo.isnull().all():
+    check_bus = net.bus.geo == 'null'
+    if 'geo' not in net.bus.columns or check_bus.all():
         logger.warning("The function set_line_geodata_from_bus_geodata requires geodata to be "
                        "present in net.bus.geo")
         return
     if overwrite and line_index is None:
         line_index = net.line.index
     elif not overwrite and line_index is None:
-        line_index = net.line.index[net.line.geo.isnull()]
+        line_index = net.line.index[net.line.geo == 'null']
     elif not overwrite and line_index is not None:
-        line_index = pd.Index(line_index).intersection(net.line.index[net.line.geo.isnull()])
+        line_index = pd.Index(line_index).intersection(net.line.index[net.line.geo == 'null'])
 
     geos, line_index_successful = coords_from_node_geodata(
         element_indices=line_index,
