@@ -236,8 +236,8 @@ def create_generic_coordinates(net, mg=None, library="igraph",
 
 
 def _prepare_geodata_table(net, geodata_table, overwrite):
-    if geodata_table in net and "geo" in net[geodata_table] and net[geodata_table]["geo"].apply(
-            geojson.loads).dropna().shape[0]:
+    if geodata_table in net and "geo" in net[geodata_table] and net[geodata_table]["geo"].loc[
+        net[geodata_table]["geo"] != 'null'].shape[0]:
         if overwrite:
             net[geodata_table] = net[geodata_table].drop("geo", axis=1)
             net[geodata_table] = net[geodata_table].apply(geojson.loads).dropna(how='all').apply(geojson.dumps)

@@ -396,7 +396,7 @@ class GeoAccessor:
         """
         Loads the GeoJSON objects.
         """
-        return self._obj.apply(loads).dropna()
+        return self._obj.apply(loads)
 
     @property
     def type(self):

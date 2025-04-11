@@ -110,8 +110,8 @@ def test_net_deepcopy():
 
     if GEOPANDAS_INSTALLED:
         for tab in ('bus', 'line'):
-            net[f'{tab}_geodata'] = gpd.GeoDataFrame(net[tab].geo.apply(geojson.loads).dropna().apply(
-                lambda x: x["coordinates"]), geometry=net[tab].geo.apply(geojson.loads).dropna())
+            net[f'{tab}_geodata'] = gpd.GeoDataFrame(net[tab].geo.apply(geojson.loads).apply(
+                lambda x: x["coordinates"] if x is not None else x), geometry=net[tab].geo.apply(geojson.loads))
         net1 = net.deepcopy()
         assert isinstance(net1.line_geodata, gpd.GeoDataFrame)
         assert isinstance(net1.bus_geodata, gpd.GeoDataFrame)

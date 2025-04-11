@@ -255,7 +255,8 @@ def _create_node_trace(net, nodes=None, size=5, patch_type='circle', color='blue
                       marker=dict(color=color, size=size, symbol=patch_type))
     nodes = net[node_element].index.tolist() if nodes is None else list(nodes)
     node_plot_index = [b for b in nodes if b in list(set(nodes) & set(net[node_element]["geo"].index))]
-    node_trace['x'], node_trace['y'] = zip(*net[node_element].loc[node_plot_index, 'geo'].apply(geojson.loads).dropna().apply(geojson.utils.coords).apply(next).to_list())
+    node_trace['x'], node_trace['y'] = zip(*net[node_element].loc[node_plot_index, 'geo'].apply(
+        geojson.loads).apply(geojson.utils.coords).apply(next).to_list())
     if not isinstance(infofunc, pd.Series) and isinstance(infofunc, Iterable) and \
             len(infofunc) == len(nodes):
         infofunc = pd.Series(index=nodes, data=infofunc)
@@ -942,7 +943,8 @@ def create_weighted_marker_trace(net, elm_type="load", elm_ids=None, column_to_p
                        + str(values_by_bus.loc[values_by_bus < 0]))
 
     # add geodata:
-    xy_list = net[node_element].loc[values_by_bus.index, 'geo'].apply(geojson.loads).dropna().apply(geojson.utils.coords).apply(next)
+    xy_list = net[node_element].loc[values_by_bus.index, 'geo'].apply(
+        geojson.loads).apply(geojson.utils.coords).apply(next)
     x_list, y_list = zip(*xy_list)
 
     # set up hover info:
@@ -1004,7 +1006,7 @@ def create_scale_trace(net, weighted_trace, down_shift=0):
     unit = scale_info["scale_legend_unit"]  # p_mw...q_mvar ..
 
     # scale trace
-    bus_x, bus_y = zip(*net.bus.geo.apply(geojson.loads).dropna().apply(geojson.utils.coords).apply(next))
+    bus_x, bus_y = zip(*net.bus.geo.apply(geojson.loads).apply(geojson.utils.coords).apply(next))
     x_max, y_max = max(bus_x), max(bus_y)
     x_min, y_min = min(bus_x), min(bus_y)
     x_pos = x_max + (x_max - x_min) * 0.2

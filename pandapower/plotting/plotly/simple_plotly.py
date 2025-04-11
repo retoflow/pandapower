@@ -7,7 +7,6 @@
 import warnings
 from typing_extensions import overload
 import pandas as pd
-from geojson import loads
 
 from pandapower.plotting.generic_geodata import create_generic_coordinates
 from pandapower.plotting.plotly.traces import create_bus_trace, create_line_trace, \
@@ -285,7 +284,7 @@ def _simple_plotly_generic(net, respect_separators, use_branch_geodata, branch_w
 
     settings = settings_defaults | settings if settings else {}  # add missing settings to settings dict
 
-    if len(net[node_element]["geo"].apply(loads).dropna()) == 0:
+    if len(net[node_element]["geo"].loc[net[node_element]["geo"] != 'null']) == 0:
         logger.warning(
             "No or insufficient geodata available --> Creating artificial coordinates. This may take some time..."
         )

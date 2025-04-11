@@ -406,7 +406,7 @@ def plot_tripped_grid(net, trip_decisions, sc_location, bus_size=0.055, plot_ann
 
         bus_text = bus_text[:-1]
 
-        bus_geodata = net.bus.geo.apply(geojson.loads).dropna().apply(geojson.utils.coords).apply(next).to_list()
+        bus_geodata = net.bus.geo.apply(geojson.loads).apply(geojson.utils.coords).apply(next).to_list()
 
         # placing bus
         bus_index = [(x[0] - 0.11, x[1] + 0.095) for x in bus_geodata]
