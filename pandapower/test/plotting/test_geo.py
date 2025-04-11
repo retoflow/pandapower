@@ -21,7 +21,7 @@ from pandapower.test.helper_functions import create_test_network
 
 def _bus_geojson_to_geodata_(_net):
     _net["bus_geodata"] = pd.DataFrame(
-        _net.bus.geo.apply(geojson.loads).apply(geojson.utils.coords).apply(next).to_list(),
+        _net.bus.geo.apply(geojson.loads).dropna().apply(geojson.utils.coords).apply(next).to_list(),
         index=_net.bus.geo.apply(geojson.loads).index,
         columns=["x", "y"]
     )

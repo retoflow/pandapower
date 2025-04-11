@@ -52,7 +52,7 @@ def _get_coords_from_bus_idx(net: pandapowerNet, bus_idx: pd.Index) -> List[Tupl
     try:
         bl = net.bus.geo.loc[net.bus.geo != 'null'].loc[bus_idx]
         if isinstance(bl, pd.Series):
-            return bl.apply(geojson.loads).apply(geojson.utils.coords).apply(next).to_list()
+            return bl.apply(geojson.loads).dropna().apply(geojson.utils.coords).apply(next).to_list()
         else:
             return [next(geojson.utils.coords(geojson.loads(bl)))]
     except KeyError:
@@ -64,7 +64,7 @@ def _get_coords_from_line_idx(net: pandapowerNet, line_idx: pd.Index) -> List[Tu
     try:
         ll = net.line.geo.loc[net.line.geo != 'null'].loc[line_idx]
         if isinstance(ll, pd.Series):
-            return ll.apply(geojson.loads).apply(geojson.utils.coords).apply(next).to_list()
+            return ll.apply(geojson.loads).dropna().apply(geojson.utils.coords).apply(next).to_list()
         else:
             return [next(geojson.utils.coords(geojson.loads(ll)))]
     except KeyError:
@@ -406,7 +406,7 @@ def plot_tripped_grid(net, trip_decisions, sc_location, bus_size=0.055, plot_ann
 
         bus_text = bus_text[:-1]
 
-        bus_geodata = net.bus.geo.apply(geojson.loads).apply(geojson.utils.coords).apply(next).to_list()
+        bus_geodata = net.bus.geo.apply(geojson.loads).dropna().apply(geojson.utils.coords).apply(next).to_list()
 
         # placing bus
         bus_index = [(x[0] - 0.11, x[1] + 0.095) for x in bus_geodata]
@@ -594,7 +594,7 @@ def plot_tripped_grid_protection_device(net, trip_decisions, sc_location, sc_bus
 
         bus_text = bus_text[:-1]
 
-        bus_geodata = net.bus.geo.apply(geojson.loads).apply(geojson.utils.coords).apply(next).to_list()
+        bus_geodata = net.bus.geo.apply(geojson.loads).dropna().apply(geojson.utils.coords).apply(next).to_list()
 
         # placing bus
         bus_geodata = [(x[0] - 0.11, x[1] + 0.095) for x in bus_geodata]

@@ -69,7 +69,7 @@ def get_collection_sizes(net, bus_size=1.0, ext_grid_size=1.0, trafo_size=1.0, l
     :return: sizes (dict) - dictionary containing all scaled sizes
     """
 
-    lst = net.bus.geo.apply(geojson.loads).apply(geojson.utils.coords).apply(next).values
+    lst = net.bus.geo.apply(geojson.loads).dropna().apply(geojson.utils.coords).apply(next).values
     mean_distance_between_buses = sum(map(lambda a, b: (a-b)/200, *(map(max, zip(*lst)), map(min, zip(*lst)))))
 
     sizes = {
