@@ -513,32 +513,35 @@ def abstract_convert_geodata_to_geojson(
         geo_df.dropna(inplace=True)
         geo_as_json = pd.Series(
             [
-                f'{{type: Point, "coordinates": [{x}, {y}}}]'
+                f'{{"coordinates": [{x}, {y}], "type": "Point"}}'
                 for x, y in (zip(geo_df[a], geo_df[b]))
             ],
             index=geo_df.index,
             name="geo",
         )
-        net.bus.loc[:, 'geo'] = geo_as_json
+        net.bus.loc[geo_df.index, 'geo'] = geo_as_json
 
     if not geo_ldf.empty:
         ldf["geo"] = 'null'
-        for i, geo in geo_ldf.iterrows():
-            if not geo['coords']:
-                continue
-            coords: List[List[float]] = []
-            for x, y in geo.coords:
-                if not drop_invalid_geodata and ((not _is_valid_number(x)) | (not _is_valid_number(y))):
-                    raise ValueError(
-                        "There exists invalid line geodata at index %s. Please clean up your data first or "
-                        "set 'drop_invalid_geodata' to True" % i)
-                elif _is_valid_number(x) and _is_valid_number(y):
-                    coords += [[float(y), float(x)] if lonlat else [float(x), float(y)]]
-                else:
-                    logger.warning("line geodata at index %s is invalid and replaced by 'null'" % i)
-            ls = f'{{"coordinates": {coords}, "type": "LineString"}}'
-            ldf["geo"] = ldf["geo"].astype(object)
-            ldf.loc[i, "geo"] = ls
+        geo_ldf = geo_ldf.explode("coords")
+        geo_ldf.dropna(inplace=True)
+        coords_na = geo_ldf["coords"].apply(lambda x: sum(pd.isna(list(x))) if isinstance(x, (list, tuple)) else 999)
+        if not drop_invalid_geodata and any(coords_na == 1):
+            raise ValueError(f"There exists invalid bus geodata at index "
+                             f"{list(net.line_geodata[coords_na==1].index)}. "
+                             f"Please clean up your data first or "
+                             "set 'drop_invalid_geodata' to True")
+        if any(coords_na == 1):
+            logger.warning(f"line geodata at index "
+                           f"{list(net.line_geodata[coords_na==1].index)} is invalid and replaced by 'null'")
+        geo_ldf = geo_ldf[coords_na == 0]
+        geo_ldf['coords'] = geo_ldf['coords'].apply(lambda coord_list: [float(x) for x in coord_list])
+        # group by index and create geojson
+        geo_as_json = geo_ldf.groupby(geo_ldf.index).apply(
+            lambda x: f'{{"coordinates": {list(x.coords)}, "type": "LineString"}}')
+        coords_na_sum = coords_na.groupby(coords_na.index).sum()
+        geo_ldf.loc[coords_na_sum != 0] = 'null'
+        net.line.loc[geo_ldf.index, 'geo'] = geo_as_json
 
     if delete:
         if hasattr(net, bus_geo_name): del net[bus_geo_name]

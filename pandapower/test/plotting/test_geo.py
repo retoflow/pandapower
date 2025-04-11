@@ -22,7 +22,7 @@ from pandapower.test.helper_functions import create_test_network
 def _bus_geojson_to_geodata_(_net):
     _net["bus_geodata"] = pd.DataFrame(
         _net.bus.geo.apply(geojson.loads).dropna().apply(geojson.utils.coords).apply(next).to_list(),
-        index=_net.bus.geo.apply(geojson.loads).index,
+        index=_net.bus.geo.apply(geojson.loads).dropna().index,
         columns=["x", "y"]
     )
     _net["bus_geodata"]["coords"] = math.nan
@@ -31,7 +31,7 @@ def _bus_geojson_to_geodata_(_net):
 
 
 def _line_geojson_to_geodata_(_net):
-    _net["line_geodata"] = _net.line.geo.apply(geojson.loads).apply(geojson.utils.coords).apply(
+    _net["line_geodata"] = _net.line.geo.apply(geojson.loads).dropna().apply(geojson.utils.coords).apply(
         list).to_frame().rename(columns={"geo": "coords"})
     _net.line.drop("geo", axis=1, inplace=True)
 
