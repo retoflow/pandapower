@@ -176,4 +176,4 @@ if __name__ == "__main__":
     # settings = get_command_line_args()
     # start_tests(**settings)
     # run_tutorials()
-    run_all_tests(parallel=False, n_cpu=4)
+    run_all_tests(parallel=True, n_cpu=4)
