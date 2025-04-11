@@ -492,7 +492,7 @@ def abstract_convert_geodata_to_geojson(
     ldf = net[branch_name]
     bus_geo_name = node_name + '_geodata'
     line_geo_name = branch_name + '_geodata'
-    geo_df = net[bus_geo_name] if (
+    geo_df = net[bus_geo_name][['x', 'y']] if (
                 hasattr(net, bus_geo_name) and isinstance(net[bus_geo_name], pd.DataFrame)) else pd.DataFrame()
     geo_ldf = net[line_geo_name] if (
                 hasattr(net, line_geo_name) and isinstance(net[line_geo_name], pd.DataFrame)) else pd.DataFrame()
@@ -500,14 +500,26 @@ def abstract_convert_geodata_to_geojson(
     a, b = "yx" if lonlat else "xy"  # substitute x and y with a and b to reverse them if necessary
     if not geo_df.empty:
         df["geo"] = 'null'
-        for i, geo in geo_df.iterrows():
-            if not drop_invalid_geodata and ((not _is_valid_number(geo.x)) | (not _is_valid_number(geo.y))):
-                raise ValueError("There exists invalid bus geodata at index %s. Please clean up your data first or "
-                                 "set 'drop_invalid_geodata' to True" % i)
-            elif _is_valid_number(geo.x) and _is_valid_number(geo.y):
-                df.loc[i, "geo"] = f'{{"coordinates": [{float(geo[a])}, {float(geo[b])}], "type": "Point"}}'
-            else:
-                logger.warning("bus geodata at index %s is invalid and replaced by 'null'" % i)
+        geo_df = geo_df.astype({"x": float, "y": float})
+        coords_na = geo_df[["x", "y"]].isna().sum(axis=1)
+        if not drop_invalid_geodata and any(coords_na == 1):
+            raise ValueError(f"There exists invalid bus geodata at index "
+                             f"{list(net.bus_geodata[coords_na==1].index)}. "
+                             f"Please clean up your data first or "
+                             "set 'drop_invalid_geodata' to True")
+        if any(coords_na == 1):
+            logger.warning(f"bus geodata at index "
+                           f"{list(net.bus_geodata[coords_na==1].index)} is invalid and replaced by 'null'")
+        geo_df.dropna(inplace=True)
+        geo_as_json = pd.Series(
+            [
+                f'{{type: Point, "coordinates": [{x}, {y}}}]'
+                for x, y in (zip(geo_df[a], geo_df[b]))
+            ],
+            index=geo_df.index,
+            name="geo",
+        )
+        net.bus.loc[:, 'geo'] = geo_as_json
 
     if not geo_ldf.empty:
         ldf["geo"] = 'null'
