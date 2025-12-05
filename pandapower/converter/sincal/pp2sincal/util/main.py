@@ -231,7 +231,7 @@ def create_load(net, net_pp, elements, plotting=True, loads=None, corresponding=
         ld.SetValue('Q', load.q_mvar)
         ld.SetValue('fP', load.scaling)
         ld.SetValue('fQ', load.scaling)
-        geo = net_pp.bus.geo.loc[load.bus]
+        geo = net_pp.bus_geodata.loc[load.bus, :]
         net_pp['sincal_lookup'] = pd.concat([net_pp['sincal_lookup'],
                                              pd.Series(['element', e_id, corresponding, idx],
                                                        index=['table_name', 'id', 'pp_element',
@@ -804,7 +804,7 @@ def create_line(net, net_pp, plotting=True, lines=None):
                                              pd.Series(['element', e_id, 'line', idx],
                                                        index=['table_name', 'id', 'pp_element',
                                                               'pp_index']).to_frame().T])
-        if plotting and line.name in net_pp.line_geodata.index:
+        if plotting:
             line_geodata = net_pp.line_geodata.loc[line.name, 'coords']
             tile = net.GetCommonObject("GraphicAreaTile", 1)
             factor = tile.GetValue('ScalePaper')
