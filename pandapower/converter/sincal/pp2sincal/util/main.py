@@ -169,7 +169,7 @@ def create_bus(net, net_pp, voltage_level_dict, plotting=True, buses=None, buses
         b = net.CreateNode(bus['Sinc_Name'])
         n_id = b.GetValue("Node_ID")
         b.SetValue('Un', bus.vn_kv)
-        buses.Node_ID.at[idx] = n_id
+        buses.at[idx, "Node_ID"] = n_id
 
         b.SetValue('Node_ID', bus.name)
         t = {'n': 1, 'b': 1, 'ha': 1, 'm': 3, 'db': 2, 'auxiliary': 3, 'Muffe': 3}[bus.type]
@@ -225,7 +225,7 @@ def create_load(net, net_pp, elements, plotting=True, loads=None, corresponding=
     for idx, load in loads.iterrows():
         ld = net.CreateElement('Load', load['Sinc_Name'], net_pp.bus.loc[load.bus, 'Sinc_Name'])
         e_id = ld.GetValue("Element_ID")
-        loads.Element_ID.at[idx] = e_id
+        loads.at[idx, "Element_ID"] = e_id
 
         ld.SetValue('P', load.p_mw)
         ld.SetValue('Q', load.q_mvar)
@@ -299,7 +299,7 @@ def create_sgen(net, net_pp, elements, plotting=True, sgens=None, power_flow_typ
     for idx, sgen in sgens.iterrows():
         s = net.CreateElement('DCInfeeder', sgen['Sinc_Name'], net_pp.bus.loc[sgen.bus, 'Sinc_Name'])
         e_id = s.GetValue("Element_ID")
-        sgens.Element_ID.at[idx] = e_id
+        sgens.at[idx, "Element_ID"] = e_id
         s.SetValue('Sn', sgen.sn_mva)
         s.SetValue('P', sgen.p_mw)
         if power_flow_type == 'pv':
@@ -393,7 +393,7 @@ def create_synchronous(net, net_pp, elements, synchronous, plotting=True, power_
             s.SetValue('fQ', sync.scaling)
 
         e_id = s.GetValue("Element_ID")
-        synchronous.Element_ID.at[idx] = e_id
+        synchronous.at[idx, "Element_ID"] = e_id
         s.SetValue('Umax_Inverter', v_max * 100)
         s.SetValue('Umin_Inverter', v_min * 100)
         net_pp['sincal_lookup'] = pd.concat([net_pp['sincal_lookup'],
@@ -489,7 +489,7 @@ def create_asymmetric_sgen(net, net_pp, elements, plotting=True, sgens=None, pow
         s.SetValue('Umax_Inverter', v_max * 100)
         s.SetValue('Umin_Inverter', v_min * 100)
         terminal.Update()
-        sgens['Element_ID_%s' % phase].at[idx] = e_id
+        sgens.at[idx, 'Element_ID_%s' % phase] = e_id
         net_pp['sincal_lookup'] = pd.concat([net_pp['sincal_lookup'],
                                              pd.Series(['element', e_id, 'asymmetric_sgen', idx],
                                                        index=['table_name', 'id', 'pp_element',
@@ -580,7 +580,7 @@ def create_ext_grid(net, net_pp, elements, plotting=True, ext_grids=None):
     for idx, ext_grid in ext_grids.iterrows():
         ext = net.CreateElement('Infeeder', ext_grid['Sinc_Name'], net_pp.bus.loc[ext_grid.bus, 'Sinc_Name'])
         e_id = ext.GetValue("Element_ID")
-        ext_grids.Element_ID.at[idx] = e_id
+        ext_grids.at[idx, "Element_ID"] = e_id
 
         ext.SetValue('Flag_Lf', 3)
         ext.SetValue('u', ext_grid.vm_pu * 100)
@@ -645,7 +645,7 @@ def create_trafo(net, net_pp, plotting=False, trafos=None):
         t = net.CreateElement('TwoWindingTransformer', trafo['Sinc_Name'], net_pp.bus.loc[trafo.hv_bus, 'Sinc_Name'],
                               net_pp.bus.loc[trafo.lv_bus, 'Sinc_Name'])
         e_id = t.GetValue("Element_ID")
-        trafos.Element_ID.at[idx] = e_id
+        trafos.at[idx, "Element_ID"] = e_id
 
         t.SetValue('Un1', trafo.vn_hv_kv)
         t.SetValue('Un2', trafo.vn_lv_kv)
@@ -782,7 +782,7 @@ def create_line(net, net_pp, plotting=True, lines=None):
         ln = net.CreateElement('Line', line['Sinc_Name'], net_pp.bus.loc[line.from_bus, 'Sinc_Name'],
                                net_pp.bus.loc[line.to_bus, 'Sinc_Name'])
         e_id = ln.GetValue("Element_ID")
-        lines.Element_ID.at[idx] = e_id
+        lines.at[idx, "Element_ID"] = e_id
 
         ln.SetValue('l', line.length_km)
         ln.SetValue('r', line.r_ohm_per_km)
@@ -939,7 +939,7 @@ def create_switch(net, net_pp, plotting=True, switches=None):
                                        net_pp.bus.loc[switch.element, 'Sinc_Name'])
             # Saving Element_ID
             e_id = cnnctr.GetValue("Element_ID")
-            switches.Element_ID.at[idx] = e_id
+            switches.at[idx, "Element_ID"] = e_id
 
             # Parametrization
             cnnctr.SetValue('l', 0)
@@ -1008,7 +1008,7 @@ def create_switch(net, net_pp, plotting=True, switches=None):
 
             # Saving Element_ID
             e_id = brk_l.GetValue("Element_ID")
-            switches.Element_ID.at[idx] = e_id
+            switches.at[idx, "Element_ID"] = e_id
 
             # Parametrization
             brk_l.SetValue("Flag_State", int(switch.closed))  # 0: Open, 1: Closed
@@ -1022,7 +1022,7 @@ def create_switch(net, net_pp, plotting=True, switches=None):
             line_idx = switch.element
             bus_idx = switch.bus
 
-            l_eid = net_pp.line.Element_ID.at[line_idx]
+            l_eid = net_pp.line.at[line_idx, "Element_ID"]
             ln = net.GetCommonObject("Line", l_eid)  # Get Element ID
 
             l_tid1 = ln.GetValue("Terminal1.Terminal_ID")
@@ -1059,7 +1059,7 @@ def create_switch(net, net_pp, plotting=True, switches=None):
 
             # Saving Element_ID
             e_id = brk_t.GetValue("Element_ID")
-            switches.Element_ID.at[idx] = e_id
+            switches.at[idx, "Element_ID"] = e_id
 
             # Parametrization
             brk_t.SetValue("Flag_State", int(switch.closed))  # 0: Open, 1: Closed
@@ -1073,7 +1073,7 @@ def create_switch(net, net_pp, plotting=True, switches=None):
             trafo_idx = switch.element
             bus_idx = switch.bus
 
-            t_eid = net_pp.trafo.Element_ID.at[trafo_idx]
+            t_eid = net_pp.trafo.at[trafo_idx, "Element_ID"]
             tr = net.GetCommonObject("TwoWindingTransformer", t_eid)  # Get Element ID
 
             t_tid1 = tr.GetValue("Terminal1.Terminal_ID")
@@ -1132,7 +1132,7 @@ def create_gen(net, net_pp, elements, plotting=True, gens=None):
     for idx, gen in gens.iterrows():
         g = net.CreateElement('SynchronousMachine', gen['Sinc_Name'], net_pp.bus.loc[gen.bus, 'Sinc_Name'])
         e_id = g.GetValue("Element_ID")
-        gens.Element_ID.at[idx] = e_id
+        gens.at[idx, "Element_ID"] = e_id
 
         g.SetValue('Sn', gen.sn_mva)
         g.SetValue('Flag_Lf', 11)
