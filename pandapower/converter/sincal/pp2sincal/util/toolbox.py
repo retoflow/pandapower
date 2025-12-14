@@ -22,14 +22,14 @@ def _unique_naming(net_pp):
     '''
     for element in ['bus', 'line', 'dcline', 'load', 'sgen', 'asymmetric_sgen',
                     'gen', 'ext_grid', 'trafo', 'storage', 'switch']:
-        net_pp[element]["Sinc_Name"] = None
+        tab = net_pp[element]
+        tab["Sinc_Name"] = tab["name"]
 
-        names = net_pp[element].name
-        if (len(set(names)) != len(names)) or any(names == None):
-            net_pp[element].loc[:, 'Sinc_Name'] = element + net_pp[element].index.astype(str).values
-        else:
-            net_pp[element].loc[:, 'Sinc_Name'] = names
-
+        null_names = tab.index[(pd.isnull(tab.Sinc_Name)) | (tab.Sinc_Name=="None") | (tab.Sinc_Name=="")]
+        tab.loc[null_names, "Sinc_Name"] = null_names.astype(str)
+        counts = tab.groupby("Sinc_Name").cumcount()
+        tab["Sinc_Name"] = tab["Sinc_Name"] + counts.replace(0, "").astype(str).radd(" (").add(")").replace(" ()", "")
+        
 
 def _number_of_elements(net_pp):
     '''
