@@ -935,174 +935,96 @@ def create_switch(net, net_pp, plotting=True, switches=None):
 
         # Model Bus-Bus Switches as Lines with Type "Connector" (3)
         if switch.et == 'b':
-            cnnctr = net.CreateElement('Line', 'switch_' + str(idx), net_pp.bus.loc[switch.bus, 'Sinc_Name'],
-                                       net_pp.bus.loc[switch.element, 'Sinc_Name'])
-            # Saving Element_ID
-            e_id = cnnctr.GetValue("Element_ID")
-            switches.at[idx, "Element_ID"] = e_id
-
-            # Parametrization
-            cnnctr.SetValue('l', 0)
-            cnnctr.SetValue('Flag_LineTyp', 3)  # Setting Type as Connector
-
-            # Create Breaker
-            brk_b = net.CreateObject('Breaker')
+            # Create Switch
+            fb = net_pp.bus.loc[switch.bus, 'Sinc_Name']
+            tb = net_pp.bus.loc[switch.element, 'Sinc_Name']
+            brk_b = net.CreateElement('Switch', switch.Sinc_Name, fb, tb)
             brk_b.SetValue("Flag_State", int(switch.closed))
-            brk_b.SetValue("Name", "switch_" + str(idx))
+            e_id = brk_b.GetValue("Element_ID")
 
             # Set thermal limit current
-            if pd.notnull(switch.in_ka):
-                brk_b.SetValue("I_n", switch.in_ka)
+            # if pd.notnull(switch.in_ka):
+            #     brk_b.SetValue("I_n", switch.in_ka)
 
-            b_tid = cnnctr.GetValue("Terminal1.Terminal_ID")
-            brk_b.SetValue("Terminal_ID", b_tid)
             net_pp['sincal_lookup'] = pd.concat([net_pp['sincal_lookup'],
                                                  pd.Series(['element', e_id, 'switch', idx],
                                                            index=['table_name', 'id', 'pp_element',
                                                                   'pp_index']).to_frame().T])
             if plotting:
-                tile = net.GetCommonObject("GraphicAreaTile", 1)
-                factor = tile.GetValue('ScalePaper')
-                cnnctr.CreateGraphic()
-                t_id = cnnctr.GetValue('Terminal1.Terminal_ID')
-                gterminal = net.GetCommonObject("GraphicTerminal", t_id)
-                gt_id = gterminal.GetValue('GraphicText_ID')
-                gtext = net.GetCommonObject("GraphicText", gt_id)
-                gtext.SetValue("Visible", 0)
-                gtext.Update()
-                gtext = net.GetCommonObject("GraphicText", gt_id - 1)
-                gtext.SetValue("Visible", 0)
-                gtext.Update()
-                t_id = cnnctr.GetValue('Terminal2.Terminal_ID')
-                gterminal = net.GetCommonObject("GraphicTerminal", t_id)
-                gt_id = gterminal.GetValue('GraphicText_ID')
-                gtext = net.GetCommonObject("GraphicText", gt_id)
-                gtext.SetValue("Visible", 0)
-                gtext.Update()
-                gelement = net.GetCommonObject("GraphicElement", e_id)
-                gt_id = gelement.GetValue('GraphicText_ID1')
-                gtexte = net.GetCommonObject("GraphicText", gt_id)
-                pos = gtexte.GetValue("Pos2")
-                gtexte.SetValue("Pos2", pos + 0.015 * factor / 4)
-                gtexte.Update()
-
                 brk_b.CreateGraphic()
-                brk_b.SetValue("GraphicAddTerminal.SymType", 3)  # 3: Circle Symbol
-                b_tid = brk_b.GetValue("Breaker_ID")
-                gaddterm = net.GetCommonObject('GraphicAddTerminal', b_tid)
-                if gaddterm is not None:
-                    gaddterm.SetValue('SymNodePos', 50)
-                    gt_id = gaddterm.GetValue('GraphicText_ID')
-                    gtext = net.GetCommonObject("GraphicText", gt_id)
-                    gtext.SetValue("Visible", 0)
-                    pos = gtext.GetValue("Pos2")
-                    gtext.SetValue("Pos2", pos + 0.015 * factor / 4)
-                    gtext.Update()
-                    gaddterm.Update()
-            cnnctr.Update()
             brk_b.Update()
+
+            #     cnnctr.CreateGraphic()
+            #     t_id = cnnctr.GetValue('Terminal1.Terminal_ID')
+            #     gterminal = net.GetCommonObject("GraphicTerminal", t_id)
+            #     gt_id = gterminal.GetValue('GraphicText_ID')
+            #     gtext = net.GetCommonObject("GraphicText", gt_id)
+            #     gtext.SetValue("Visible", 0)
+            #     gtext.Update()
+            #     gtext = net.GetCommonObject("GraphicText", gt_id - 1)
+            #     gtext.SetValue("Visible", 0)
+            #     gtext.Update()
+            #     t_id = cnnctr.GetValue('Terminal2.Terminal_ID')
+            #     gterminal = net.GetCommonObject("GraphicTerminal", t_id)
+            #     gt_id = gterminal.GetValue('GraphicText_ID')
+            #     gtext = net.GetCommonObject("GraphicText", gt_id)
+            #     gtext.SetValue("Visible", 0)
+            #     gtext.Update()
+            #     gelement = net.GetCommonObject("GraphicElement", e_id)
+            #     gt_id = gelement.GetValue('GraphicText_ID1')
+            #     gtexte = net.GetCommonObject("GraphicText", gt_id)
+            #     pos = gtexte.GetValue("Pos2")
+            #     gtexte.SetValue("Pos2", pos + 0.015 * factor / 4)
+            #     gtexte.Update()
+
+            #     brk_b.CreateGraphic()
+            #     brk_b.SetValue("GraphicAddTerminal.SymType", 3)  # 3: Circle Symbol
+            #     b_tid = brk_b.GetValue("Breaker_ID")
+            #     gaddterm = net.GetCommonObject('GraphicAddTerminal', b_tid)
+            #     if gaddterm is not None:
+            #         gaddterm.SetValue('SymNodePos', 50)
+            #         gt_id = gaddterm.GetValue('GraphicText_ID')
+            #         gtext = net.GetCommonObject("GraphicText", gt_id)
+            #         gtext.SetValue("Visible", 0)
+            #         pos = gtext.GetValue("Pos2")
+            #         gtext.SetValue("Pos2", pos + 0.015 * factor / 4)
+            #         gtext.Update()
+            #         gaddterm.Update()
+            # cnnctr.Update()
 
         # Model Bus-Line Switches as Breaker
         elif switch.et == 'l':
-            brk_l = net.CreateObject('Breaker')
+            if not switch.closed:
+                line_idx = switch.element
+                bus_idx = switch.bus
 
-            # Saving Element_ID
-            e_id = brk_l.GetValue("Element_ID")
-            switches.at[idx, "Element_ID"] = e_id
+                l_eid = net_pp.line.at[line_idx, "Element_ID"]
+                ln = net.GetCommonObject("Line", l_eid)  # Get Element ID
 
-            # Parametrization
-            brk_l.SetValue("Flag_State", int(switch.closed))  # 0: Open, 1: Closed
-            brk_l.SetValue("Name", "switch_" + str(idx))
-
-            # Set thermal limit current
-            if pd.notnull(switch.in_ka):
-                brk_l.SetValue("I_n", switch.in_ka)
-
-            # Chose correct Terminal (from_bus = Terminal1 | to_bus = Terminal2)
-            line_idx = switch.element
-            bus_idx = switch.bus
-
-            l_eid = net_pp.line.at[line_idx, "Element_ID"]
-            ln = net.GetCommonObject("Line", l_eid)  # Get Element ID
-
-            l_tid1 = ln.GetValue("Terminal1.Terminal_ID")
-            l_tid2 = ln.GetValue("Terminal2.Terminal_ID")
-            if bus_idx == net_pp.line.from_bus.at[line_idx]:
-                brk_l.SetValue("Terminal_ID", l_tid1)
-            else:
-                brk_l.SetValue("Terminal_ID", l_tid2)
-            net_pp['sincal_lookup'] = pd.concat([net_pp['sincal_lookup'],
-                                                 pd.Series(['element', e_id, 'switch', idx],
-                                                           index=['table_name', 'id', 'pp_element',
-                                                                  'pp_index']).to_frame().T])
-            if plotting:
-                tile = net.GetCommonObject("GraphicAreaTile", 1)
-                factor = tile.GetValue('ScalePaper')
-                brk_l.CreateGraphic()
-                brk_l.SetValue("GraphicAddTerminal.SymType", 3)  # 3: Circle Symbol
-                b_tid = brk_l.GetValue("Breaker_ID")
-                gaddterm = net.GetCommonObject('GraphicAddTerminal', b_tid)
-                if gaddterm is not None:
-                    gaddterm.SetValue('SymNodePos', 50)
-                    gt_id = gaddterm.GetValue('GraphicText_ID')
-                    gtext = net.GetCommonObject("GraphicText", gt_id)
-                    gtext.SetValue("Visible", 0)
-                    pos = gtext.GetValue("Pos2")
-                    gtext.SetValue("Pos2", pos + 0.015 * factor / 4)
-                    gtext.Update()
-                    gaddterm.Update()
-            brk_l.Update()
+                if bus_idx == net_pp.line.from_bus.at[line_idx]:
+                    term_id = ln.GetValue("Terminal1.Terminal_ID")
+                else:
+                    term_id = ln.GetValue("Terminal2.Terminal_ID")
+                term = net.GetCommonObject("Terminal", term_id)  # Get Element ID
+                term.SetValue("Flag_State", 0)  # 0: Open, 1: Closed
+                term.Update()
 
         # Model Bus-Trafo Switches as Breaker
         elif switch.et == 't':
-            brk_t = net.CreateObject('Breaker')
+            if not switch.closed:
+                trafo_idx = switch.element
+                bus_idx = switch.bus
 
-            # Saving Element_ID
-            e_id = brk_t.GetValue("Element_ID")
-            switches.at[idx, "Element_ID"] = e_id
+                t_eid = net_pp.trafo.at[trafo_idx, "Element_ID"]
+                ln = net.GetCommonObject("Trafo", t_eid)  # Get Element ID
 
-            # Parametrization
-            brk_t.SetValue("Flag_State", int(switch.closed))  # 0: Open, 1: Closed
-            brk_t.SetValue("Name", "switch_" + str(idx))
-
-            # Set thermal limit current
-            if pd.notnull(switch.in_ka):
-                brk_t.SetValue("I_n", switch.in_ka)
-
-            # Chose correct Terminal (hv_bus = Terminal1 | lv_bus = Terminal2)
-            trafo_idx = switch.element
-            bus_idx = switch.bus
-
-            t_eid = net_pp.trafo.at[trafo_idx, "Element_ID"]
-            tr = net.GetCommonObject("TwoWindingTransformer", t_eid)  # Get Element ID
-
-            t_tid1 = tr.GetValue("Terminal1.Terminal_ID")
-            t_tid2 = tr.GetValue("Terminal2.Terminal_ID")
-            if bus_idx == net_pp.trafo.hv_bus.at[trafo_idx]:
-                brk_t.SetValue("Terminal_ID", t_tid1)
-            else:
-                brk_t.SetValue("Terminal_ID", t_tid2)
-            net_pp['sincal_lookup'] = pd.concat([net_pp['sincal_lookup'],
-                                                 pd.Series(['element', e_id, 'switch', idx],
-                                                           index=['table_name', 'id', 'pp_element',
-                                                                  'pp_index']).to_frame().T])
-            if plotting:
-                tile = net.GetCommonObject("GraphicAreaTile", 1)
-                factor = tile.GetValue('ScalePaper')
-                brk_t.CreateGraphic()
-                brk_t.SetValue("GraphicAddTerminal.SymType", 3)  # 3: Circle Symbol
-                b_tid = brk_t.GetValue("Breaker_ID")
-                gaddterm = net.GetCommonObject("GraphicAddTerminal", b_tid)
-                if gaddterm is not None:
-                    gaddterm.SetValue('SymNodePos', 50)
-                    gt_id = gaddterm.GetValue('GraphicText_ID')
-                    gtext = net.GetCommonObject("GraphicText", gt_id)
-                    gtext.SetValue("Visible", 0)
-                    pos = gtext.GetValue("Pos2")
-                    gtext.SetValue("Pos2", pos + 0.015 * factor / 4)
-                    gtext.Update()
-                    gaddterm.Update()
-            brk_t.Update()
+                if bus_idx == net_pp.trafo.hv_bus.at[trafo_idx]:
+                    term_id = ln.GetValue("Terminal1.Terminal_ID")
+                else:
+                    term_id = ln.GetValue("Terminal2.Terminal_ID")
+                term = net.GetCommonObject("Terminal", term_id)  # Get Element ID
+                term.SetValue("Flag_State", 0)  # 0: Open, 1: Closed
+                term.Update()
     if len(net_pp.switch) > 500:
         net.Close()
         net.OpenEx()
