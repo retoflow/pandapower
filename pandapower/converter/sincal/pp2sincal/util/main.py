@@ -17,6 +17,21 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
+TYPES = {'n': 1, 
+                'b': 1, 
+                'ha': 1, 
+                'm': 3, 
+                'db': 2, 
+                'auxiliary': 3, 
+                'Muffe': 3,
+                'hv_mv_station': 4,
+                'mv_station': 9,
+                'mv_lv_station': 5,
+                'kv': 6,
+                'lv_substation': 6
+            }
+
+
 
 def net_preparation(net, net_pp, doc):
     '''
@@ -172,7 +187,7 @@ def create_bus(net, net_pp, voltage_level_dict, plotting=True, buses=None, buses
         buses.at[idx, "Node_ID"] = n_id
 
         b.SetValue('Node_ID', bus.name)
-        t = {'n': 1, 'b': 1, 'ha': 1, 'm': 3, 'db': 2, 'auxiliary': 3, 'Muffe': 3}[bus.type]
+        t = TYPES.get(bus.type, 3)
         b.SetValue('Flag_Type', t)
         net_pp['sincal_lookup'] = pd.concat([net_pp['sincal_lookup'],
                                              pd.Series(['node', n_id, 'bus', idx],
