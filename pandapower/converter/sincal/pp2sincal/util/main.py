@@ -3,12 +3,15 @@ import time
 
 import numpy as np
 import pandas as pd
+from shapely.geometry import LineString, Point
+from shapely.ops import nearest_points
 
 import pandapower as pp
 from pandapower.converter.sincal.pp2sincal.util.finalization import write_to_net, close_net
 from pandapower.converter.sincal.pp2sincal.util.initialization import create_simulation_environment, initialize_net
 from pandapower.converter.sincal.pp2sincal.util.toolbox import _unique_naming, _number_of_elements, _scaling, \
     _initialize_voltage_level, _set_calc_params, _get_vector_group, _adapt_geo_coordinates
+from itertools import chain
 
 try:
     import pandaplan.core.pplog as logging
@@ -151,6 +154,23 @@ def convert_pandapower_net(net, net_pp, doc, plotting=True, dc_as_sync=False):
     create_switch(net, net_pp, plotting)
 
 
+def _get_node_center(bus, geo):
+    x = geo.x
+    y = geo.y
+    if "substation_geo" in bus and pd.notnull(bus.substation_geo):
+        coords = bus.substation_geo["coordinates"]
+        x += coords[1]
+        y += coords[0]
+    return x, y
+
+def _get_node_coords(bus, geo):
+    x, y = _get_node_center(bus, geo)
+    if "length" in bus and pd.notnull(bus.length):
+        return [(x-bus.length/2, y), (x+bus.length/2, y)]
+    else:
+        return [(x, y)]
+
+
 def create_bus(net, net_pp, voltage_level_dict, plotting=True, buses=None, buses_geodata=None):
     '''
     The function creates an electrical aquivalent element of the chosen pandapower-buses in the
@@ -179,6 +199,8 @@ def create_bus(net, net_pp, voltage_level_dict, plotting=True, buses=None, buses
     zipped = net_pp.bus_geodata.x.astype(str) + net_pp.bus_geodata.y.astype(str)
     _, idx, no = np.unique(zipped, return_counts=True, return_index=True)
     buses['Node_ID'] = None
+    tile = net.GetCommonObject("GraphicAreaTile", 1)
+    factor = tile.GetValue('ScalePaper')
     for (idx, bus), (_, geo) in zip(buses.iterrows(), buses_geodata.iterrows()):
         net.SetParameter("NetworkLevel", voltage_level_dict[bus.vn_kv])
         b = net.CreateNode(bus['Sinc_Name'])
@@ -194,16 +216,8 @@ def create_bus(net, net_pp, voltage_level_dict, plotting=True, buses=None, buses
                                                        index=['table_name', 'id', 'pp_element',
                                                               'pp_index']).to_frame().T])
         if plotting:
-            tile = net.GetCommonObject("GraphicAreaTile", 1)
-            factor = tile.GetValue('ScalePaper')
-            b.CreateGraphic(geo.x, geo.y)
-            if bus.type == 'db':
-                gnode = net.GetCommonObject("GraphicNode", n_id)
-                coord_x = gnode.GetValue('NodeStartX')
-                gnode.SetValue("SymType", 3)
-                gnode.SetValue('NodeStartX', coord_x - factor)
-                gnode.SetValue('NodeEndX', coord_x + factor)
-                gnode.Update()
+            coords = _get_node_coords(bus, geo)
+            b.CreateGraphic(*list(chain.from_iterable(coords)))
             gtext = net.GetCommonObject("GraphicText", n_id)
             pos = gtext.GetValue("Pos2")
             pos += pos + factor / 4
@@ -606,13 +620,15 @@ def create_ext_grid(net, net_pp, elements, plotting=True, ext_grids=None):
         if plotting:
             tile = net.GetCommonObject("GraphicAreaTile", 1)
             factor = tile.GetValue('ScalePaper')
-            x = 0.015 * np.cos(np.deg2rad(elements[0][ext_grid.bus] * elements[1][ext_grid.bus] + 10))
+            x = 0.015 * np.cos(np.deg2rad(elements[0][ext_grid.bus] * elements[1][ext_grid.bus] + 90))
             y = np.sqrt(0.015 ** 2 - x ** 2)
             if (elements[0][ext_grid.bus] * elements[1][ext_grid.bus] + 10 > 180) and \
                     (elements[0][ext_grid.bus] * elements[1][ext_grid.bus] + 10 < 360):
                 y = - y
-            geo = net_pp.bus_geodata.loc[ext_grid.bus, :]
-            ext.CreateGraphic(geo.x + x * factor, geo.y + y * factor)
+            bus = net_pp.bus.loc[ext_grid.bus]
+            geo = net_pp.bus_geodata.loc[ext_grid.bus]
+            bus_x, bus_y = _get_node_center(bus, geo)
+            ext.CreateGraphic(bus_x + x * factor, bus_y + y * factor)
             t_id = ext.GetValue('Terminal1.Terminal_ID')
             gterminal = net.GetCommonObject("GraphicTerminal", t_id)
             gterminal.SetValue('SwtNodePos', 15)
@@ -966,6 +982,19 @@ def create_switch(net, net_pp, plotting=True, switches=None):
                                                            index=['table_name', 'id', 'pp_element',
                                                                   'pp_index']).to_frame().T])
             if plotting:
+                coords1 = _get_node_coords(net_pp.bus.loc[switch.bus], net_pp.bus_geodata.loc[switch.bus])
+                coords2 = _get_node_coords(net_pp.bus.loc[switch.element], net_pp.bus_geodata.loc[switch.element])
+                if len(coords1) > 1 or len(coords2) > 1:
+                    shape1 = LineString(coords1) if len(coords1) > 1 else Point(coords1[0])
+                    shape2 = LineString(coords2) if len(coords2) > 1 else Point(coords2[0])
+
+                    p1, p2 = nearest_points(shape1, shape2)
+                    x1, y1 = p1.coords[0]
+                    x2, y2 = p2.coords[0]
+                    brk_b.SetValue("GraphicTerminal1.PosX", x1)
+                    brk_b.SetValue("GraphicTerminal1.PosY",  y1)
+                    brk_b.SetValue("GraphicTerminal2.PosX", x2)
+                    brk_b.SetValue("GraphicTerminal2.PosY",  y2)
                 brk_b.CreateGraphic()
             brk_b.Update()
 
