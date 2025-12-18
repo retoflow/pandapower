@@ -169,6 +169,10 @@ def _get_node_coords(bus, geo):
         return [(x-bus.length/2, y), (x+bus.length/2, y)]
     else:
         return [(x, y)]
+    
+def _set_gis_id(element_object, element_data):
+    if "gis_id" in element_data and pd.notnull(element_data["gis_id"]):
+        element_object.SetValue('TextVal', element_data.gis_id)
 
 
 def create_bus(net, net_pp, voltage_level_dict, plotting=True, buses=None, buses_geodata=None):
@@ -211,6 +215,7 @@ def create_bus(net, net_pp, voltage_level_dict, plotting=True, buses=None, buses
         b.SetValue('Node_ID', bus.name)
         t = TYPES.get(bus.type, 3)
         b.SetValue('Flag_Type', t)
+        _set_gis_id(b, bus)
         net_pp['sincal_lookup'] = pd.concat([net_pp['sincal_lookup'],
                                              pd.Series(['node', n_id, 'bus', idx],
                                                        index=['table_name', 'id', 'pp_element',
@@ -261,6 +266,7 @@ def create_load(net, net_pp, elements, plotting=True, loads=None, corresponding=
         ld.SetValue('fP', load.scaling)
         ld.SetValue('fQ', load.scaling)
         geo = net_pp.bus_geodata.loc[load.bus, :]
+        _set_gis_id(ld, load)
         net_pp['sincal_lookup'] = pd.concat([net_pp['sincal_lookup'],
                                              pd.Series(['element', e_id, corresponding, idx],
                                                        index=['table_name', 'id', 'pp_element',
@@ -340,6 +346,7 @@ def create_sgen(net, net_pp, elements, plotting=True, sgens=None, power_flow_typ
             s.SetValue('fQ', sgen.scaling)
         s.SetValue('Umax_Inverter', v_max * 100)
         s.SetValue('Umin_Inverter', v_min * 100)
+        _set_gis_id(s, sgen)
         net_pp['sincal_lookup'] = pd.concat([net_pp['sincal_lookup'],
                                              pd.Series(['element', e_id, corresponding, idx],
                                                        index=['table_name', 'id', 'pp_element',
@@ -425,6 +432,7 @@ def create_synchronous(net, net_pp, elements, synchronous, plotting=True, power_
         synchronous.at[idx, "Element_ID"] = e_id
         s.SetValue('Umax_Inverter', v_max * 100)
         s.SetValue('Umin_Inverter', v_min * 100)
+        _set_gis_id(s, sync)
         net_pp['sincal_lookup'] = pd.concat([net_pp['sincal_lookup'],
                                              pd.Series(['element', e_id, 'sgen', idx],
                                                        index=['table_name', 'id', 'pp_element',
@@ -555,18 +563,21 @@ def create_asymmetric_sgen(net, net_pp, elements, plotting=True, sgens=None, pow
             s1 = net.CreateElement('SynchronousMachine', sgen['Sinc_Name'], net_pp.bus.loc[sgen.bus, 'Sinc_Name'])
             e_id1 = s1.GetValue("Element_ID")
             _set_values(s1, e_id1, power_flow_type, phase='a')
+            _set_gis_id(s1, sgen)
         else:
             s1 = None
         if sgen.p_b_mw != 0 or sgen.q_b_mvar != 0:
             s2 = net.CreateElement('SynchronousMachine', sgen['Sinc_Name'], net_pp.bus.loc[sgen.bus, 'Sinc_Name'])
             e_id2 = s2.GetValue("Element_ID")
             _set_values(s2, e_id2, power_flow_type, phase='b')
+            _set_gis_id(s2, sgen)
         else:
             s2 = None
         if sgen.p_c_mw != 0 or sgen.q_c_mvar != 0:
             s3 = net.CreateElement('SynchronousMachine', sgen['Sinc_Name'], net_pp.bus.loc[sgen.bus, 'Sinc_Name'])
             e_id3 = s3.GetValue("Element_ID")
             _set_values(s3, e_id3, power_flow_type, phase='c')
+            _set_gis_id(s3, sgen)
         else:
             s3 = None
 
@@ -613,6 +624,7 @@ def create_ext_grid(net, net_pp, elements, plotting=True, ext_grids=None):
 
         ext.SetValue('Flag_Lf', 3)
         ext.SetValue('u', ext_grid.vm_pu * 100)
+        _set_gis_id(ext, ext_grid)
         net_pp['sincal_lookup'] = pd.concat([net_pp['sincal_lookup'],
                                              pd.Series(['element', e_id, 'ext_grid', idx],
                                                        index=['table_name', 'id', 'pp_element',
@@ -698,6 +710,7 @@ def create_trafo(net, net_pp, plotting=False, trafos=None):
             t.SetValue('Flag_Input', 4099)
         if not trafo.std_type is None:
             t.SetValue('Description', 'std_type: ' + trafo.std_type)
+        _set_gis_id(t, trafo)
         net_pp['sincal_lookup'] = pd.concat([net_pp['sincal_lookup'],
                                              pd.Series(['element', e_id, 'trafo', idx],
                                                        index=['table_name', 'id', 'pp_element',
@@ -830,7 +843,8 @@ def create_line(net, net_pp, plotting=True, lines=None):
         ln.SetValue('Flag_ParSys', line.parallel)
         ln.SetValue('Flag_fr', line.df)
         if not line.std_type is None:
-            ln.SetValue('Description', 'std_type: ' + line.std_type)
+            ln.SetValue('LineInfo', line.std_type)
+        _set_gis_id(ln, line)
         net_pp['sincal_lookup'] = pd.concat([net_pp['sincal_lookup'],
                                              pd.Series(['element', e_id, 'line', idx],
                                                        index=['table_name', 'id', 'pp_element',
@@ -976,6 +990,7 @@ def create_switch(net, net_pp, plotting=True, switches=None):
             # Set thermal limit current
             # if pd.notnull(switch.in_ka):
             #     brk_b.SetValue("I_n", switch.in_ka)
+            _set_gis_id(brk_b, switch)
 
             net_pp['sincal_lookup'] = pd.concat([net_pp['sincal_lookup'],
                                                  pd.Series(['element', e_id, 'switch', idx],
@@ -1104,6 +1119,7 @@ def create_gen(net, net_pp, elements, plotting=True, gens=None):
         g.SetValue('Flag_Lf', 11)
         g.SetValue('P', gen.p_mw)
         g.SetValue('u', gen.vm_pu * 100)
+        _set_gis_id(g, gen)
         net_pp['sincal_lookup'] = pd.concat([net_pp['sincal_lookup'],
                                              pd.Series(['element', e_id, 'gen', idx],
                                                        index=['table_name', 'id', 'pp_element',
