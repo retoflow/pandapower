@@ -216,6 +216,10 @@ def create_bus(net, net_pp, voltage_level_dict, plotting=True, buses=None, buses
         t = TYPES.get(bus.type, 3)
         b.SetValue('Flag_Type', t)
         _set_gis_id(b, bus)
+        if "geo" in bus and isinstance(bus.geo, dict) and "coordinates" in bus.geo:
+            lat, lon = bus.geo["coordinates"]
+            b.SetValue('lat', lat)
+            b.SetValue('lon', lon)
         net_pp['sincal_lookup'] = pd.concat([net_pp['sincal_lookup'],
                                              pd.Series(['node', n_id, 'bus', idx],
                                                        index=['table_name', 'id', 'pp_element',
