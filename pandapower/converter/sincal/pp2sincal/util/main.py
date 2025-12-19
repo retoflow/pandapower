@@ -20,7 +20,7 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
-TYPES = {'n': 1, 
+BUS_TYPES = {'n': 1, 
                 'b': 1, 
                 'ha': 1, 
                 'm': 3, 
@@ -33,6 +33,24 @@ TYPES = {'n': 1,
                 'kv': 6,
                 'lv_substation': 6
             }
+
+SYNC_TYPES = {
+    "pv": 11,
+    "wind": 9
+}
+
+FEEDER_TYPES = {
+    "pv": 7,
+    "wind": 4
+}
+
+LOAD_TYPES = {
+    "industrial": 2,
+    "hh": 3,
+    "ha": 3,
+    "hp": 4,
+    "ev": 6,
+}
 
 
 
@@ -213,7 +231,7 @@ def create_bus(net, net_pp, voltage_level_dict, plotting=True, buses=None, buses
         buses.at[idx, "Node_ID"] = n_id
 
         b.SetValue('Node_ID', bus.name)
-        t = TYPES.get(bus.type, 3)
+        t = BUS_TYPES.get(bus.type, 3)
         b.SetValue('Flag_Type', t)
         _set_gis_id(b, bus)
         if "geo" in bus and isinstance(bus.geo, dict) and "coordinates" in bus.geo:
@@ -260,6 +278,8 @@ def create_load(net, net_pp, elements, plotting=True, loads=None, corresponding=
     if loads is None:
         loads = net_pp.load
     loads['Element_ID'] = None
+    tile = net.GetCommonObject("GraphicAreaTile", 1)
+    factor = tile.GetValue('ScalePaper')
     for idx, load in loads.iterrows():
         ld = net.CreateElement('Load', load['Sinc_Name'], net_pp.bus.loc[load.bus, 'Sinc_Name'])
         e_id = ld.GetValue("Element_ID")
@@ -269,21 +289,22 @@ def create_load(net, net_pp, elements, plotting=True, loads=None, corresponding=
         ld.SetValue('Q', load.q_mvar)
         ld.SetValue('fP', load.scaling)
         ld.SetValue('fQ', load.scaling)
-        geo = net_pp.bus_geodata.loc[load.bus, :]
+        ld.SetValue('Flag_Typified', LOAD_TYPES.get(load.type, 3))
         _set_gis_id(ld, load)
         net_pp['sincal_lookup'] = pd.concat([net_pp['sincal_lookup'],
                                              pd.Series(['element', e_id, corresponding, idx],
                                                        index=['table_name', 'id', 'pp_element',
                                                               'pp_index']).to_frame().T])
         if plotting:
-            tile = net.GetCommonObject("GraphicAreaTile", 1)
-            factor = tile.GetValue('ScalePaper')
             x = 0.015 * np.sin(np.deg2rad(elements[0][load.bus] * elements[1][load.bus] + 100))
             y = np.sqrt(0.015 ** 2 - x ** 2)
             if (elements[0][load.bus] * elements[1][load.bus] + 10 > 180) and \
                     (elements[0][load.bus] * elements[1][load.bus] + 10 < 360):
                 y = - y
-            ld.CreateGraphic(geo.x + x * factor, geo.y + y * factor)
+            bus = net_pp.bus.loc[load.bus]
+            geo = net_pp.bus_geodata.loc[load.bus]
+            bus_x, bus_y = _get_node_center(bus, geo)
+            ld.CreateGraphic(bus_x + x * factor, bus_y + y * factor)
             t_id = ld.GetValue('Terminal1.Terminal_ID')
             gterminal = net.GetCommonObject("GraphicTerminal", t_id)
             gterminal.SetValue('SwtNodePos', 15)
@@ -335,6 +356,8 @@ def create_sgen(net, net_pp, elements, plotting=True, sgens=None, power_flow_typ
     sgens['Element_ID'] = None
     v_max = 2.0
     v_min = 0.0
+    tile = net.GetCommonObject("GraphicAreaTile", 1)
+    factor = tile.GetValue('ScalePaper')
     for idx, sgen in sgens.iterrows():
         s = net.CreateElement('DCInfeeder', sgen['Sinc_Name'], net_pp.bus.loc[sgen.bus, 'Sinc_Name'])
         e_id = s.GetValue("Element_ID")
@@ -350,21 +373,22 @@ def create_sgen(net, net_pp, elements, plotting=True, sgens=None, power_flow_typ
             s.SetValue('fQ', sgen.scaling)
         s.SetValue('Umax_Inverter', v_max * 100)
         s.SetValue('Umin_Inverter', v_min * 100)
+        s.SetValue('Flag_DCtyp', FEEDER_TYPES.get(sgen.type, 7))
         _set_gis_id(s, sgen)
         net_pp['sincal_lookup'] = pd.concat([net_pp['sincal_lookup'],
                                              pd.Series(['element', e_id, corresponding, idx],
                                                        index=['table_name', 'id', 'pp_element',
                                                               'pp_index']).to_frame().T])
         if plotting:
-            tile = net.GetCommonObject("GraphicAreaTile", 1)
-            factor = tile.GetValue('ScalePaper')
             x = 0.015 * np.sin(np.deg2rad(elements[0][sgen.bus] * elements[1][sgen.bus] + 100))
             y = np.sqrt(0.015 ** 2 - x ** 2)
             if (elements[0][sgen.bus] * elements[1][sgen.bus] + 10 > 180) and \
                     (elements[0][sgen.bus] * elements[1][sgen.bus] + 10 < 360):
                 y = - y
-            geo = net_pp.bus_geodata.loc[sgen.bus, :]
-            s.CreateGraphic(geo.x + x * factor, geo.y + y * factor)
+            bus = net_pp.bus.loc[sgen.bus]
+            geo = net_pp.bus_geodata.loc[sgen.bus]
+            bus_x, bus_y = _get_node_center(bus, geo)
+            s.CreateGraphic(bus_x + x * factor, bus_y + y * factor)
             t_id = s.GetValue('Terminal1.Terminal_ID')
             gterminal = net.GetCommonObject("GraphicTerminal", t_id)
             gterminal.SetValue('SwtNodePos', 15)
@@ -416,6 +440,8 @@ def create_synchronous(net, net_pp, elements, synchronous, plotting=True, power_
     synchronous['Element_ID'] = None
     v_max = 2.0
     v_min = 0.0
+    tile = net.GetCommonObject("GraphicAreaTile", 1)
+    factor = tile.GetValue('ScalePaper')
     for idx, sync in synchronous.iterrows():
         s = net.CreateElement('SynchronousMachine', sync['Sinc_Name'], net_pp.bus.loc[sync.bus, 'Sinc_Name'])
         if power_flow_type == 'pv':
@@ -437,20 +463,21 @@ def create_synchronous(net, net_pp, elements, synchronous, plotting=True, power_
         s.SetValue('Umax_Inverter', v_max * 100)
         s.SetValue('Umin_Inverter', v_min * 100)
         _set_gis_id(s, sync)
+        s.SetValue('Flag_Machine', SYNC_TYPES.get(sync.type, 11))
         net_pp['sincal_lookup'] = pd.concat([net_pp['sincal_lookup'],
                                              pd.Series(['element', e_id, 'sgen', idx],
                                                        index=['table_name', 'id', 'pp_element',
                                                               'pp_index']).to_frame().T])
         if plotting:
-            tile = net.GetCommonObject("GraphicAreaTile", 1)
-            factor = tile.GetValue('ScalePaper')
             x = 0.015 * np.sin(np.deg2rad(elements[0][sync.bus] * elements[1][sync.bus] + 100))
             y = np.sqrt(0.015 ** 2 - x ** 2)
             if (elements[0][sync.bus] * elements[1][sync.bus] + 10 > 180) and \
                     (elements[0][sync.bus] * elements[1][sync.bus] + 10 < 360):
                 y = - y
-            geo = net_pp.bus_geodata.loc[sync.bus, :]
-            s.CreateGraphic(geo.x + x * factor, geo.y + y * factor)
+            bus = net_pp.bus.loc[sync.bus]
+            geo = net_pp.bus_geodata.loc[sync.bus]
+            bus_x, bus_y = _get_node_center(bus, geo)
+            s.CreateGraphic(bus_x + x * factor, bus_y + y * factor)
             t_id = s.GetValue('Terminal1.Terminal_ID')
             gterminal = net.GetCommonObject("GraphicTerminal", t_id)
             gterminal.SetValue('SwtNodePos', 15)
@@ -541,8 +568,10 @@ def create_asymmetric_sgen(net, net_pp, elements, plotting=True, sgens=None, pow
         if (elements[0][sgen.bus] * elements[1][sgen.bus] + 10 > 180) and \
                 (elements[0][sgen.bus] * elements[1][sgen.bus] + 10 < 360):
             y = - y
-        geo = net_pp.bus_geodata.loc[sgen.bus, :]
-        s.CreateGraphic(geo.x + x * factor, geo.y + y * factor)
+        bus = net_pp.bus.loc[sgen.bus]
+        geo = net_pp.bus_geodata.loc[sgen.bus]
+        bus_x, bus_y = _get_node_center(bus, geo)
+        s.CreateGraphic(bus_x + x * factor, bus_y + y * factor)
         t_id = s.GetValue('Terminal1.Terminal_ID')
         gterminal = net.GetCommonObject("GraphicTerminal", t_id)
         gterminal.SetValue('SwtNodePos', 15)
@@ -688,6 +717,8 @@ def create_trafo(net, net_pp, plotting=False, trafos=None):
         trafos = net_pp.trafo
     trafos['Element_ID'] = None
     bus_ocr = pd.Series(np.ones(len(net_pp.bus)), index=net_pp.bus.index, name='sh')
+    tile = net.GetCommonObject("GraphicAreaTile", 1)
+    factor = tile.GetValue('ScalePaper')
     for idx, trafo in trafos.iterrows():
         t = net.CreateElement('TwoWindingTransformer', trafo['Sinc_Name'], net_pp.bus.loc[trafo.hv_bus, 'Sinc_Name'],
                               net_pp.bus.loc[trafo.lv_bus, 'Sinc_Name'])
@@ -720,30 +751,30 @@ def create_trafo(net, net_pp, plotting=False, trafos=None):
                                                        index=['table_name', 'id', 'pp_element',
                                                               'pp_index']).to_frame().T])
         if plotting:
-            tile = net.GetCommonObject("GraphicAreaTile", 1)
-            factor = tile.GetValue('ScalePaper')
+            coords1 = _get_node_coords(net_pp.bus.loc[trafo.lv_bus], net_pp.bus_geodata.loc[trafo.lv_bus])
+            coords2 = _get_node_coords(net_pp.bus.loc[trafo.hv_bus], net_pp.bus_geodata.loc[trafo.hv_bus])
+            if len(coords1) > 1 or len(coords2) > 1:
+                shape1 = LineString(coords1) if len(coords1) > 1 else Point(coords1[0])
+                shape2 = LineString(coords2) if len(coords2) > 1 else Point(coords2[0])
+
+                p1, p2 = nearest_points(shape1, shape2)
+                x1, y1 = p1.coords[0]
+                x2, y2 = p2.coords[0]
+                t.SetValue("GraphicTerminal1.PosX", x1)
+                t.SetValue("GraphicTerminal1.PosY",  y1)
+                t.SetValue("GraphicTerminal2.PosX", x2)
+                t.SetValue("GraphicTerminal2.PosY",  y2)
             t.CreateGraphic()
-            geo_hv = net_pp.bus_geodata.loc[trafo.hv_bus, :]
-            geo_lv = net_pp.bus_geodata.loc[trafo.lv_bus, :]
+
             t_id = t.GetValue('Terminal1.Terminal_ID')
             gterminal = net.GetCommonObject("GraphicTerminal", t_id)
             gterminal.SetValue('SwtNodePos', 15)
             gterminal.SetValue('SwtFactor', 20)
-            hb = trafo.hv_bus
-            nth = net_pp.trafo.loc[(net_pp.trafo.hv_bus == hb) | (net_pp.trafo.lv_bus == hb)].index
-            if len(nth) > 1:
-                n_id = net_pp.bus.loc[hb, 'Node_ID']
-                gn = net.GetCommonObject("GraphicNode", n_id)
-                nxs = gn.GetValue('NodeStartX')
-                nxe = gn.GetValue('NodeEndX')
-                nx = (nxe + nxs) / 2
-                gterminal.SetValue('PosX', nx + bus_ocr.loc[hb] * 0.02 * factor)
-                bus_ocr.loc[hb] += 1
             gterminal.Update()
             gt_id = gterminal.GetValue('GraphicText_ID')
             gtext = net.GetCommonObject("GraphicText", gt_id)
-            x = 0.1 * (geo_lv.x - geo_hv.x)
-            y = 0.1 * (geo_lv.y - geo_hv.y)
+            x = 0.1 * (x1 - x2)
+            y = 0.1 * (y1 - y2)
             gtext.SetValue("Pos1", x)
             gtext.SetValue("Pos2", y)
             gtext.Update()
@@ -752,24 +783,15 @@ def create_trafo(net, net_pp, plotting=False, trafos=None):
             gterminal = net.GetCommonObject("GraphicTerminal", t_id)
             gterminal.SetValue('SwtNodePos', 15)
             gterminal.SetValue('SwtFactor', 20)
-            lb = trafo.lv_bus
-            ntl = net_pp.trafo.loc[(net_pp.trafo.hv_bus == lb) | (net_pp.trafo.lv_bus == lb)].index
-            if len(ntl) > 1:
-                n_id = net_pp.bus.loc[lb, 'Node_ID']
-                gn = net.GetCommonObject("GraphicNode", n_id)
-                nxs = gn.GetValue('NodeStartX')
-                nxe = gn.GetValue('NodeEndX')
-                nx = (nxe + nxs) / 2
-                gterminal.SetValue('PosX', nx + bus_ocr.loc[lb] * 0.02 * factor)
-                bus_ocr.loc[lb] += 1
             gterminal.Update()
             gt_id = gterminal.GetValue('GraphicText_ID')
             gtext = net.GetCommonObject("GraphicText", gt_id)
-            x = 0.1 * (geo_hv.x - geo_lv.x)
-            y = 0.1 * (geo_hv.y - geo_lv.y)
+            x = 0.1 * (x2 - x1)
+            y = 0.1 * (y2 - y1)
             gtext.SetValue("Pos1", x)
             gtext.SetValue("Pos2", y)
             gtext.Update()
+            
             gelement = net.GetCommonObject("GraphicElement", e_id)
             gt_id = gelement.GetValue('GraphicText_ID1')
             gtexte = net.GetCommonObject("GraphicText", gt_id)
