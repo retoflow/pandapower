@@ -36,12 +36,15 @@ BUS_TYPES = {'n': 1,
 
 SYNC_TYPES = {
     "pv": 11,
-    "wind": 9
+    "wind": 9,
 }
 
 FEEDER_TYPES = {
     "pv": 7,
-    "wind": 4
+    "wind": 4,
+    "chp": 5,
+    "water": 8,
+    "biomass": 8,
 }
 
 LOAD_TYPES = {
@@ -289,7 +292,7 @@ def create_load(net, net_pp, elements, plotting=True, loads=None, corresponding=
         ld.SetValue('Q', load.q_mvar)
         ld.SetValue('fP', load.scaling)
         ld.SetValue('fQ', load.scaling)
-        ld.SetValue('Flag_Typified', LOAD_TYPES.get(load.type, 3))
+        ld.SetValue('Flag_Typified', LOAD_TYPES.get(load.type, 1))
         _set_gis_id(ld, load)
         net_pp['sincal_lookup'] = pd.concat([net_pp['sincal_lookup'],
                                              pd.Series(['element', e_id, corresponding, idx],
@@ -373,7 +376,7 @@ def create_sgen(net, net_pp, elements, plotting=True, sgens=None, power_flow_typ
             s.SetValue('fQ', sgen.scaling)
         s.SetValue('Umax_Inverter', v_max * 100)
         s.SetValue('Umin_Inverter', v_min * 100)
-        s.SetValue('Flag_DCtyp', FEEDER_TYPES.get(sgen.type, 7))
+        s.SetValue('Flag_DCtyp', FEEDER_TYPES.get(sgen.type, 1))
         _set_gis_id(s, sgen)
         net_pp['sincal_lookup'] = pd.concat([net_pp['sincal_lookup'],
                                              pd.Series(['element', e_id, corresponding, idx],
