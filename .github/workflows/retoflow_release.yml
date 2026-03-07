@@ -1,0 +1,35 @@
+name: Build and publish to PyPI
+on:
+  release:
+    types: [published]
+
+jobs:
+  build-release-artifacts:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up variables
+        run: |
+          echo "RELEASE_TAG=${{ github.event.release.tag_name }}" >> $GITHUB_ENV
+          echo "RELEASE_VERSION=$(echo ${{github.event.release.tag_name}} | cut -c 2-)" >> $GITHUB_ENV
+
+      - name: Validate release tag
+        run: |
+          if ! [[ "${RELEASE_TAG}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+\+retoflow\.[0-9]+.*$ ]]; then
+            echo "Error: Release tag '${RELEASE_TAG}' is not in the format 'vX.Y.Z+retoflow.A.*'. 
+            Please use a valid versioning format."
+            exit 1
+          fi
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd #v6.0.2
+      - name: Set release version in backend code
+        run: sed -i "s/^version = .*/version = \"$RELEASE_VERSION\"/" pyproject.toml
+      - name: Install uv
+        uses: astral-sh/setup-uv@e06108dd0aef18192324c70427afc47652e63a82 #7.5.0
+      - name: Install Python 3.12
+        run: uv python install 3.12
+      - name: Build
+        run: uv build
+      - name: Publish
+        env:
+          UV_PUBLISH_USERNAME: ${{ secrets.GITLAB_USERNAME }}
+          UV_PUBLISH_PASSWORD: ${{ secrets.GITLAB_DEPLOY_TOKEN }}
+        run: uv publish --publish-url https://gitlab.com/api/v4/projects/62822150/packages/pypi --trusted-publishing never
