@@ -28,7 +28,6 @@ jobs:
         run: uv build
       - name: Publish
         env:
-          UV_PUBLISH_INDEX: https://gitlab.com/api/v4/projects/62822150/packages/pypi
           UV_PUBLISH_USERNAME: ${{ secrets.GITLAB_USERNAME }}
           UV_PUBLISH_PASSWORD: ${{ secrets.GITLAB_DEPLOY_TOKEN }}
-        run: uv publish --trusted-publishing never
+        run: uv publish --publish-url https://gitlab.com/api/v4/projects/62822150/packages/pypi --trusted-publishing never
