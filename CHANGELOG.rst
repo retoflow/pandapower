@@ -3,6 +3,7 @@ Change Log
 
 [upcoming release] - 2026-..-..
 -------------------------------
+- [FIXED] incompatible network versions (i.e. networks with newer format versions than the currently installed pandapower version) are identified in convert_format and raise an error
 
 [3.3.2] - 2026-01-13
 -------------------------------
