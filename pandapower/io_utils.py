@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2016-2025 by University of Kassel and Fraunhofer Institute for Energy Economics
+# Copyright (c) 2016-2026 by University of Kassel and Fraunhofer Institute for Energy Economics
 # and Energy System Technology (IEE), Kassel. All rights reserved.
 
 import copy
@@ -396,6 +396,30 @@ def isinstance_partial(obj, cls):
         return False
     return isinstance(obj, cls)
 
+# builtins names that pandapower serializes (json_tuple/set/frozenset/complex), excluding unsafe `builtins` like eval, exec, type
+_SAFE_BUILTIN_NAMES = frozenset({"complex", "tuple", "set", "frozenset"})
+
+
+def _is_safe_to_deserialize(module_name, class_name, class_):
+    """True if this (module, name) is an explicitly permitted non-JSONSerializableClass type.
+
+    Covers the types produced by pandapower's to_serializable registry:
+      builtins  — complex, tuple, set, frozenset
+      numpy     — numpy.array constructor (a C function, not a class) + all numpy.generic subclasses
+      pandas    — pd.Index and its subclasses (RangeIndex, Int64Index, DatetimeIndex, …)
+    """
+    if module_name == "builtins":
+        return class_name in _SAFE_BUILTIN_NAMES
+    if module_name == "numpy":
+        # numpy.array is a C function (not a class) used to reconstruct ndarrays
+        if class_name == "array":
+            return True
+        # int8/16/32/64, uint*, float16/32/64, complex64/128, bool_, etc.
+        return isclass(class_) and issubclass(class_, numpy.generic)
+    if module_name.startswith("pandas"):
+        return isclass(class_) and issubclass(class_, pd.Index)
+    return False
+
 
 class PPJSONEncoder(json.JSONEncoder):
     def __init__(self, isinstance_func=isinstance_partial, **kwargs):
@@ -643,6 +667,10 @@ class FromSerializableRegistry():
         class_ = getattr(module, self.obj)  # works
         return class_
 
+    @from_serializable.register(class_name='bool', module_name='numpy')
+    def bool_handling(self):
+        return bool(self.obj)
+
     @from_serializable.register()
     def rest(self):
         try:
@@ -675,7 +703,10 @@ class FromSerializableRegistry():
                 del self.obj["net"]
             return class_.from_dict(self.obj)
         else:
-            # for non-pp objects, e.g. tuple
+            # only permit the specific primitive types pandapower serializes
+            if not _is_safe_to_deserialize(self.module_name, self.class_name, class_):
+                msg = f"Deserializing '{self.module_name}.{self.class_name}' is not allowed"
+                raise TypeError(msg)
             try:
                 return class_(self.obj, **self.d)
             except ValueError:
