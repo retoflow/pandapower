@@ -404,6 +404,10 @@ def check_net_version(net):
                        "`pip install --upgrade pandapower`.")
 
 
+class DeserializationNotAllowed(Exception):
+    """Raised when deserialization of a type is blocked by the security allowlist."""
+
+
 # builtins names that pandapower serializes (json_tuple/set/frozenset/complex), excluding unsafe `builtins` like eval, exec, type
 _SAFE_BUILTIN_NAMES = frozenset({"complex", "tuple", "set", "frozenset"})
 
@@ -674,7 +678,7 @@ class FromSerializableRegistry():
                               (self.obj, module.__name__))
         class_ = getattr(module, self.obj)  # works
         return class_
-    
+
     @from_serializable.register(class_name='bool', module_name='numpy')
     def bool_handling(self):
         return bool(self.obj)
@@ -714,7 +718,7 @@ class FromSerializableRegistry():
             # only permit the specific primitive types pandapower serializes
             if not _is_safe_to_deserialize(self.module_name, self.class_name, class_):
                 msg = f"Deserializing '{self.module_name}.{self.class_name}' is not allowed"
-                raise TypeError(msg)
+                raise DeserializationNotAllowed(msg)
             return class_(self.obj, **self.d)
 
     if GEOPANDAS_INSTALLED:
